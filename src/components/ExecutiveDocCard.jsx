@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Check, FileText, RotateCcw, FolderCheck, Sparkles, MessageSquare, Share2 } from 'lucide-react';
+import { ExternalLink, Copy, Check, FileText, RotateCcw, FolderCheck, Sparkles, MessageSquare, CheckCircle2, ListChecks, Calendar, User, AlignLeft } from 'lucide-react';
 
 export default function ExecutiveDocCard({ result, onReset }) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -34,6 +34,11 @@ export default function ExecutiveDocCard({ result, onReset }) {
     result?.data?.department ||
     'General';
 
+  const summary = result?.summary || result?.data?.summary;
+  const decisions = result?.decisions || result?.data?.decisions || [];
+  const actionItems = result?.action_items || result?.data?.action_items || [];
+  const discussionPoints = result?.discussion_points || result?.data?.discussion_points || [];
+
   const copyUrl = () => {
     navigator.clipboard.writeText(docUrl);
     setCopiedUrl(true);
@@ -41,7 +46,22 @@ export default function ExecutiveDocCard({ result, onReset }) {
   };
 
   const copyForTeam = () => {
-    const text = `📌 *MOM: ${docTitle}*\n🏷 *Team:* ${docDept}\n🗓 *Date:* ${result?.date || new Date().toLocaleDateString()}\n\n📄 *Full Document Link:*\n${docUrl}`;
+    let text = `📌 *MOM: ${docTitle}*\n🏷 *Team:* ${docDept}\n🗓 *Date:* ${result?.date || new Date().toLocaleDateString()}\n`;
+
+    if (summary) {
+      text += `\n📝 *Summary:*\n${summary}\n`;
+    }
+
+    if (decisions.length > 0) {
+      text += `\n🎯 *Decisions Agreed:*\n${decisions.map(d => `• ${d}`).join('\n')}\n`;
+    }
+
+    if (actionItems.length > 0) {
+      text += `\n✅ *Action Items:*\n${actionItems.map(a => `• ${a.task} — @${a.assigned_to || 'Assignee'} (Due: ${a.deadline || 'TBD'})`).join('\n')}\n`;
+    }
+
+    text += `\n📄 *Full Document Link:*\n${docUrl}`;
+
     navigator.clipboard.writeText(text);
     setCopiedSlack(true);
     setTimeout(() => setCopiedSlack(false), 2500);
@@ -106,6 +126,61 @@ export default function ExecutiveDocCard({ result, onReset }) {
         </button>
       </div>
 
+      {/* Executive Summary Card (if synthesized) */}
+      {summary && (
+        <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 text-left mb-5">
+          <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <AlignLeft className="w-3.5 h-3.5 text-[#ff4d5a]" /> Executive Brief
+          </div>
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">{summary}</p>
+        </div>
+      )}
+
+      {/* Decisions & Action Items Grid */}
+      {(decisions.length > 0 || actionItems.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-left">
+          {decisions.length > 0 && (
+            <div className="rounded-2xl bg-black/40 border border-emerald-500/20 p-4 space-y-2">
+              <div className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Decisions Agreed ({decisions.length})
+              </div>
+              <ul className="text-xs text-slate-300 space-y-1.5 pl-1">
+                {decisions.slice(0, 4).map((d, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-emerald-400 shrink-0 font-bold">•</span>
+                    <span>{d}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {actionItems.length > 0 && (
+            <div className="rounded-2xl bg-black/40 border border-[#ff4d5a]/20 p-4 space-y-2">
+              <div className="text-[11px] font-mono text-[#ff4d5a] uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                <ListChecks className="w-3.5 h-3.5" /> Action Owners ({actionItems.length})
+              </div>
+              <ul className="text-xs text-slate-300 space-y-2 pl-1">
+                {actionItems.slice(0, 3).map((item, i) => (
+                  <li key={i} className="border-b border-white/[0.04] pb-1.5 last:border-none">
+                    <div className="font-medium text-white">{item.task}</div>
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 mt-0.5">
+                      <span className="text-[#ff4d5a] flex items-center gap-1">
+                        <User className="w-2.5 h-2.5" /> {item.assigned_to || 'Assignee'}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-2.5 h-2.5" /> {item.deadline || 'TBD'}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Target Metadata & Links */}
       <div className="rounded-2xl bg-black/40 border border-white/[0.06] p-4 text-left font-mono text-xs space-y-2.5 mb-6">
         <div className="flex items-center justify-between text-slate-400 text-[11px] sm:text-xs">
@@ -124,7 +199,7 @@ export default function ExecutiveDocCard({ result, onReset }) {
           <button
             type="button"
             onClick={copyUrl}
-            className="text-slate-300 hover:text-white flex items-center gap-1 underline truncate max-w-[220px] sm:max-w-xs"
+            className="text-slate-300 hover:text-white flex items-center gap-1 underline truncate max-w-[220px] sm:max-w-xs cursor-pointer"
           >
             {copiedUrl ? 'Copied!' : 'Copy direct link'}
           </button>
