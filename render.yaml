@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tamilpreneur-mom-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MAKE_WEBHOOK_URL
+        value: https://hook.eu1.make.com/tdvaw77919n84mzfsx6cm7oxbha45bku

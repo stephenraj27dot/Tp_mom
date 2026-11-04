@@ -9,6 +9,7 @@ import Footer from './components/Footer';
 import { ArrowRight, Disc3, Zap, Users, ExternalLink } from 'lucide-react';
 
 const STORAGE_KEY = 'tamilpreneur_mom_archive';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -82,15 +83,15 @@ export default function App() {
       let data = {};
       let finalDocUrl = 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit';
 
-      // Path 1: Local / Self-Hosted Node Server (Handles up to 2.0 GB via disk streaming + FFmpeg)
-      if (!isVercel) {
+      // Path 1: Local / Cloud Node Server (Handles up to 2.0 GB via disk streaming + FFmpeg)
+      if (!isVercel || API_BASE) {
         try {
           const formData = new FormData();
           formData.append('audio', file);
           formData.append('title', resolvedTitle);
           formData.append('department', department);
 
-          const res = await fetch('/api/trigger-mom', {
+          const res = await fetch(`${API_BASE}/api/trigger-mom`, {
             method: 'POST',
             body: formData,
           });
