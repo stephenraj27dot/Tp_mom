@@ -1,0 +1,864 @@
+{
+  "flow": [
+    {
+      "id": 1,
+      "mapper": {},
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Custom Webhook Trigger"
+        },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          }
+        ]
+      },
+      "parameters": {
+        "hook": 4037703
+      }
+    },
+    {
+      "id": 11,
+      "filter": null,
+      "mapper": {
+        "file_data": "{{toBinary(1.file_data; \"base64\")}}",
+        "file_name": "{{ifempty(1.file_name; \"meeting-audio.mp3\")}}"
+      },
+      "module": "gemini-ai:uploadAFile",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "file_name",
+            "type": "text",
+            "label": "Name",
+            "required": true,
+            "semantic": "file:name"
+          },
+          {
+            "name": "file_data",
+            "type": "buffer",
+            "label": "Data",
+            "required": true,
+            "semantic": "file:data"
+          },
+          {
+            "name": "useFileSearchStore",
+            "type": "boolean",
+            "label": "Use File Search Store",
+            "default": false,
+            "required": false
+          }
+        ],
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Stephen's Gemini AI connection"
+            }
+          }
+        },
+        "designer": {
+          "x": 300,
+          "y": 0
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:gemini-ai-q9zyjp",
+            "label": "Connection",
+            "required": true
+          }
+        ]
+      },
+      "parameters": {
+        "__IMTCONN__": 11269694
+      }
+    },
+    {
+      "id": 12,
+      "mapper": {
+        "model": "gemini-3.5-transcribe",
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "type": "file",
+                "file_data": {
+                  "file_uri": "{{11.uri}}",
+                  "mime_type": "{{11.mimeType}}"
+                }
+              },
+              {
+                "text": "Transcribe this meeting audio accurately. Return only the full transcript. Preserve speaker turns when possible.",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      },
+      "module": "gemini-ai:createACompletionGeminiPro",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "model",
+            "type": "select",
+            "label": "AI Model",
+            "dynamic": true,
+            "grouped": true,
+            "required": true
+          },
+          {
+            "name": "contents",
+            "spec": [
+              {
+                "name": "role",
+                "type": "select",
+                "label": "Role",
+                "required": true,
+                "validate": {
+                  "enum": [
+                    "user",
+                    "model"
+                  ]
+                }
+              },
+              {
+                "name": "parts",
+                "spec": [
+                  {
+                    "name": "type",
+                    "type": "select",
+                    "label": "Message Type",
+                    "required": true,
+                    "validate": {
+                      "enum": [
+                        "text",
+                        "file",
+                        "functionCall",
+                        "functionResponse"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "thoughtSignature",
+                    "type": "text",
+                    "label": "Thought Signature"
+                  }
+                ],
+                "type": "array",
+                "label": "Parts",
+                "required": true
+              }
+            ],
+            "type": "array",
+            "label": "Messages",
+            "required": true
+          },
+          {
+            "name": "system_instruction",
+            "spec": [
+              {
+                "name": "parts",
+                "spec": {
+                  "spec": [
+                    {
+                      "name": "text",
+                      "type": "text",
+                      "label": "Value"
+                    }
+                  ],
+                  "type": "collection",
+                  "label": "Prompt"
+                },
+                "type": "array",
+                "label": "Prompts",
+                "labels": {
+                  "add": "Add a System Prompt"
+                }
+              }
+            ],
+            "type": "collection",
+            "label": "System Instructions"
+          },
+          {
+            "name": "safetySettings",
+            "spec": [
+              {
+                "name": "category",
+                "type": "select",
+                "label": "Category",
+                "validate": {
+                  "enum": [
+                    "HARM_CATEGORY_HARASSMENT",
+                    "HARM_CATEGORY_HATE_SPEECH",
+                    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "HARM_CATEGORY_DANGEROUS_CONTENT"
+                  ]
+                }
+              },
+              {
+                "name": "threshold",
+                "type": "select",
+                "label": "Threshold",
+                "validate": {
+                  "enum": [
+                    "BLOCK_LOW_AND_ABOVE",
+                    "BLOCK_MEDIUM_AND_ABOVE",
+                    "BLOCK_ONLY_HIGH",
+                    "BLOCK_NONE"
+                  ]
+                }
+              }
+            ],
+            "type": "array",
+            "label": "Safety Settings",
+            "advanced": true,
+            "required": false
+          },
+          {
+            "name": "generationConfig",
+            "spec": [
+              {
+                "name": "stopSequences",
+                "spec": {
+                  "type": "text",
+                  "label": "Stop Sequence"
+                },
+                "type": "array",
+                "label": "Stop Sequences",
+                "advanced": true,
+                "required": false
+              },
+              {
+                "name": "responseModalities",
+                "type": "select",
+                "label": "Response Modalities",
+                "advanced": false,
+                "multiple": true,
+                "required": false,
+                "validate": {
+                  "enum": [
+                    "text",
+                    "image"
+                  ]
+                }
+              },
+              {
+                "name": "maxOutputTokens",
+                "type": "number",
+                "label": "Max Output Tokens",
+                "advanced": true,
+                "required": false
+              },
+              {
+                "name": "temperature",
+                "type": "number",
+                "label": "Temperature",
+                "advanced": true,
+                "required": false,
+                "validate": {
+                  "max": 1,
+                  "min": 0
+                }
+              },
+              {
+                "name": "topP",
+                "type": "number",
+                "label": "Top P",
+                "advanced": true,
+                "required": false,
+                "validate": {
+                  "max": 1,
+                  "min": 0
+                }
+              },
+              {
+                "name": "topK",
+                "type": "number",
+                "label": "Top K",
+                "advanced": true,
+                "required": false
+              },
+              {
+                "name": "thinkingConfig",
+                "spec": [
+                  {
+                    "name": "thinkingBudget",
+                    "type": "number",
+                    "label": "Thinking Budget",
+                    "advanced": true,
+                    "required": false
+                  },
+                  {
+                    "name": "include_thoughts",
+                    "type": "boolean",
+                    "label": "Include Thoughts",
+                    "advanced": true,
+                    "required": false
+                  },
+                  {
+                    "name": "thinking_level",
+                    "type": "select",
+                    "label": "Thinking Level",
+                    "validate": {
+                      "enum": [
+                        "low",
+                        "high"
+                      ]
+                    }
+                  }
+                ],
+                "type": "collection",
+                "label": "Thinking Config",
+                "advanced": true
+              },
+              {
+                "name": "mediaResolution",
+                "type": "select",
+                "label": "Media Resolution",
+                "validate": {
+                  "enum": [
+                    "media_resolution_low",
+                    "media_resolution_medium",
+                    "media_resolution_high"
+                  ]
+                }
+              },
+              {
+                "name": "imageConfig",
+                "spec": [
+                  {
+                    "name": "imageSize",
+                    "type": "select",
+                    "label": "Image Size",
+                    "validate": {
+                      "enum": [
+                        "1K",
+                        "2K",
+                        "4K"
+                      ]
+                    }
+                  }
+                ],
+                "type": "collection",
+                "label": "Image Configuration"
+              },
+              {
+                "name": "responseMimeType",
+                "type": "select",
+                "label": "Response Format",
+                "dynamic": true,
+                "advanced": true,
+                "required": false,
+                "validate": {
+                  "enum": [
+                    "application/json"
+                  ]
+                }
+              }
+            ],
+            "type": "collection",
+            "label": "Generation configurations",
+            "advanced": false
+          },
+          {
+            "name": "tools",
+            "type": "any",
+            "label": "Tools",
+            "advanced": true
+          },
+          {
+            "name": "tool_config",
+            "type": "any",
+            "label": "Tool Config",
+            "advanced": true
+          },
+          {
+            "name": "function_declarations_context",
+            "type": "boolean",
+            "label": "Function Declarations Grounding"
+          },
+          {
+            "name": "url_context",
+            "type": "boolean",
+            "label": "URL Context",
+            "required": false
+          },
+          {
+            "name": "google_search_context",
+            "type": "boolean",
+            "label": "Google Search Grounding",
+            "required": false
+          },
+          {
+            "name": "code_execution",
+            "type": "boolean",
+            "label": "Code Execution",
+            "required": false
+          },
+          {
+            "name": "google_maps_context",
+            "type": "boolean",
+            "label": "Google Maps Grounding",
+            "required": false
+          },
+          {
+            "name": "file_search_store_context",
+            "type": "boolean",
+            "label": "File Search Store Context",
+            "required": false
+          },
+          {
+            "name": "serviceTier",
+            "type": "select",
+            "label": "Inference Service Tier",
+            "dynamic": true,
+            "advanced": true,
+            "validate": {
+              "enum": [
+                "priority",
+                "flex"
+              ]
+            }
+          }
+        ],
+        "restore": {
+          "expect": {
+            "model": {
+              "mode": "chose",
+              "label": "Gemini 3.5 Transcribe"
+            },
+            "contents": {
+              "mode": "chose",
+              "items": [
+                {
+                  "role": {
+                    "mode": "chose",
+                    "label": "User"
+                  },
+                  "parts": {
+                    "mode": "chose",
+                    "items": [
+                      {
+                        "type": {
+                          "mode": "chose",
+                          "label": "File",
+                          "nested": [
+                            {
+                              "name": "file_data",
+                              "spec": [
+                                {
+                                  "name": "mime_type",
+                                  "type": "text",
+                                  "label": "Mime Type",
+                                  "required": true
+                                },
+                                {
+                                  "help": "You can use public or signed URLs as input by using the URLs.",
+                                  "name": "file_uri",
+                                  "type": "text",
+                                  "label": "File URI",
+                                  "required": true
+                                }
+                              ],
+                              "type": "collection",
+                              "label": "File Data",
+                              "required": true
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "type": {
+                          "mode": "chose",
+                          "label": "Text",
+                          "nested": [
+                            {
+                              "name": "text",
+                              "type": "text",
+                              "label": "Text",
+                              "required": true
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Stephen's Gemini AI connection"
+            }
+          }
+        },
+        "designer": {
+          "x": 600,
+          "y": 0
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:gemini-ai-q9zyjp",
+            "label": "Connection",
+            "required": true
+          }
+        ]
+      },
+      "parameters": {
+        "__IMTCONN__": 11269694
+      }
+    },
+    {
+      "id": 6,
+      "mapper": {
+        "model": "gemini-2.5-flash",
+        "textPrompt": "Extract the meeting transcript into exactly one valid JSON object. Return ONLY raw JSON, with no markdown, no ``` fences, no explanation, and no extra text. Use exactly these fields: meeting_title (string), meeting_date (string), participants (array of strings), discussion_points (array of strings), decisions (array of strings), action_items (array of objects with task, assigned_to, deadline, priority, status), follow_up_items (array of strings), additional_notes (string). If a value is missing, use an empty string or empty array. Transcript: {{12.candidates[1].content.parts[1].audioTranscription.text}}"
+      },
+      "module": "gemini-ai:simpleTextPrompt",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "model",
+            "type": "select",
+            "label": "Model",
+            "mappable": false,
+            "required": true,
+            "validate": {
+              "enum": [
+                "gemini-2.5-flash",
+                "gemini-3.8-flash",
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash",
+                "gemini-3.1-pro-preview",
+                "gemini-3-flash-preview",
+                "gemini-2.5-pro"
+              ]
+            }
+          },
+          {
+            "name": "textPrompt",
+            "type": "text",
+            "label": "Text prompt",
+            "required": true
+          }
+        ],
+        "restore": {
+          "expect": {
+            "model": {
+              "mode": "chose",
+              "label": "Gemini 2.5 Flash"
+            }
+          }
+        },
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Gemini MOM Extraction"
+        }
+      },
+      "parameters": {}
+    },
+    {
+      "id": 7,
+      "mapper": {
+        "json": "{{6.result}}"
+      },
+      "module": "json:ParseJSON",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "json",
+            "type": "text",
+            "label": "JSON string",
+            "required": true
+          }
+        ],
+        "restore": {
+          "parameters": {
+            "type": {
+              "label": "MOM_JSON_Structure_v2"
+            }
+          }
+        },
+        "designer": {
+          "x": 1200,
+          "y": 0,
+          "name": "Parse MOM JSON"
+        },
+        "interface": [
+          {
+            "name": "meeting_title",
+            "type": "text",
+            "label": "Meeting title"
+          },
+          {
+            "name": "meeting_date",
+            "type": "text",
+            "label": "Meeting date"
+          },
+          {
+            "name": "participants",
+            "type": "array",
+            "label": "Participants"
+          },
+          {
+            "name": "discussion_points",
+            "type": "array",
+            "label": "Discussion points"
+          },
+          {
+            "name": "decisions",
+            "type": "array",
+            "label": "Decisions"
+          },
+          {
+            "name": "action_items",
+            "spec": {
+              "spec": [
+                {
+                  "name": "task",
+                  "type": "text"
+                },
+                {
+                  "name": "assigned_to",
+                  "type": "text"
+                },
+                {
+                  "name": "deadline",
+                  "type": "text"
+                },
+                {
+                  "name": "priority",
+                  "type": "text"
+                },
+                {
+                  "name": "status",
+                  "type": "text"
+                }
+              ],
+              "type": "collection"
+            },
+            "type": "array",
+            "label": "Action items"
+          },
+          {
+            "name": "follow_up_items",
+            "type": "array",
+            "label": "Follow up items"
+          },
+          {
+            "name": "additional_notes",
+            "type": "text",
+            "label": "Additional notes"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "type": "udt",
+            "label": "Data structure"
+          }
+        ]
+      },
+      "parameters": {
+        "type": 600144
+      }
+    },
+    {
+      "id": 18,
+      "filter": null,
+      "mapper": {
+        "name": "{{ifempty(7.meeting_title; \"Minutes of Meeting\")}} - {{ifempty(7.meeting_date; \"Not mentioned\")}}",
+        "footer": false,
+        "header": false,
+        "content": "<h1>Minutes of Meeting</h1><p><b>Meeting Date:</b> {{ifempty(7.meeting_date; \"Not mentioned\")}}</p><p><b>Meeting Title / Subject:</b> {{ifempty(7.meeting_title; \"Not mentioned\")}}</p><h2>Participants</h2><p>{{ifempty(join(7.participants; \", \"); \"Not mentioned\")}}</p><h2>Agenda</h2><p>Not mentioned</p><h2>Discussion Points</h2><p>{{ifempty(join(7.discussion_points; \"<br>• \"); \"Not mentioned\")}}</p><h2>Decisions Made</h2><p>{{ifempty(join(7.decisions; \"<br>• \"); \"Not mentioned\")}}</p><h2>Action Items</h2><p>{{ifempty(join(map(7.action_items; \"task\"); \"<br>• \"); \"Not mentioned\")}}</p><h2>Assigned Person</h2><p>{{ifempty(join(map(7.action_items; \"assigned_to\"); \"<br>• \"); \"Not mentioned\")}}</p><h2>Deadline</h2><p>{{ifempty(join(map(7.action_items; \"deadline\"); \"<br>• \"); \"Not mentioned\")}}</p><h2>Status</h2><p>{{ifempty(join(map(7.action_items; \"status\"); \"<br>• \"); \"Not mentioned\")}}</p><h2>Remarks</h2><p>{{ifempty(join(7.follow_up_items; \"<br>• \"); ifempty(7.additional_notes; \"Not mentioned\"))}}</p>",
+        "folderId": "/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP",
+        "destination": "drive"
+      },
+      "module": "google-docs:createADocument",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "name",
+            "type": "text",
+            "label": "Name",
+            "required": true
+          },
+          {
+            "name": "content",
+            "type": "text",
+            "label": "Content",
+            "required": true
+          },
+          {
+            "name": "destination",
+            "type": "select",
+            "label": "Choose a Drive",
+            "required": true,
+            "validate": {
+              "enum": [
+                "drive",
+                "share",
+                "team"
+              ]
+            }
+          },
+          {
+            "name": "header",
+            "type": "boolean",
+            "label": "Insert a Header",
+            "required": true
+          },
+          {
+            "name": "footer",
+            "type": "boolean",
+            "label": "Insert a Footer",
+            "required": true
+          },
+          {
+            "name": "folderId",
+            "type": "folder",
+            "label": "New Document's Location",
+            "required": true
+          }
+        ],
+        "restore": {
+          "expect": {
+            "folderId": {
+              "mode": "chose",
+              "path": [
+                "meeting-audio"
+              ]
+            },
+            "destination": {
+              "label": "My Drive"
+            }
+          },
+          "parameters": {
+            "__IMTCONN__": {
+              "data": {
+                "scoped": "true",
+                "connection": "google"
+              },
+              "label": "Stephen's Google connection (astephenraj72@gmail.com)"
+            }
+          }
+        },
+        "designer": {
+          "x": 1500,
+          "y": 0,
+          "name": "Create MOM Doc"
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:google",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "setupValidation": {
+          "result": {
+            "valid": true,
+            "fields": []
+          },
+          "version": 1,
+          "configuration": "ccfa342b1bc36408"
+        }
+      },
+      "parameters": {
+        "__IMTCONN__": 11270293
+      }
+    },
+    {
+      "id": 19,
+      "mapper": {
+        "body": "{\"status\":\"success\",\"id\":\"{{18.id}}\",\"documentId\":\"{{ifempty(18.id; 18.documentId)}}\",\"webViewLink\":\"{{18.webViewLink}}\",\"documentUrl\":\"{{ifempty(18.webViewLink; 18.alternateLink)}}\",\"title\":\"{{ifempty(1.title; 7.meeting_title)}}\",\"date\":\"{{ifempty(1.date; 7.meeting_date)}}\"}",
+        "status": 200,
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "name": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      },
+      "module": "gateway:WebhookRespond",
+      "version": 1,
+      "metadata": {
+        "expect": [
+          {
+            "name": "status",
+            "type": "number",
+            "label": "Status",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "label": "Body"
+          },
+          {
+            "name": "headers",
+            "spec": [
+              {
+                "name": "name",
+                "type": "text",
+                "label": "Key",
+                "required": true
+              },
+              {
+                "name": "value",
+                "type": "text",
+                "label": "Value",
+                "required": true
+              }
+            ],
+            "type": "array",
+            "label": "Custom headers"
+          }
+        ],
+        "designer": {
+          "x": 1800,
+          "y": 0,
+          "name": "Send MOM Response to UI"
+        }
+      },
+      "parameters": {}
+    }
+  ],
+  "name": "MOM - Gemini STT Studio Webhook",
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "designer": {
+      "orphans": []
+    },
+    "scenario": {
+      "dlq": false,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "roundtrips": 1,
+      "autoCommitTriggerLast": true
+    }
+  }
+}

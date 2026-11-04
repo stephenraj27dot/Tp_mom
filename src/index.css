@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+body {
+  background-color: #070B12;
+  color: #f1f5f9;
+  min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Professional Executive Ambient Backdrop */
+.brand-ambient-glow {
+  position: absolute;
+  top: -160px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80vw;
+  max-width: 700px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(255, 77, 90, 0.08) 0%, rgba(255, 77, 90, 0.02) 40%, rgba(7, 11, 18, 0) 70%);
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(80px);
+}
+
+/* Clean, Professional Button Classes */
+.btn-executive-primary {
+  background: #ff4d5a;
+  color: #ffffff;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 14px 0 rgba(255, 77, 90, 0.22);
+}
+
+.btn-executive-primary:hover:not(:disabled) {
+  background: #ff3847;
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 24px 0 rgba(255, 77, 90, 0.35);
+}
+
+.btn-executive-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.97);
+  box-shadow: 0 2px 6px 0 rgba(255, 77, 90, 0.18);
+}
+
+/* Secondary Button Hover */
+.btn-executive-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-executive-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+  color: #ffffff;
+}
+
+.btn-executive-secondary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.97);
+}
+
+/* Card Hover Lift */
+.card-hover-interactive {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover-interactive:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Department Pill Hover */
+.pill-hover-interactive {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pill-hover-interactive:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 77, 90, 0.3);
+  transform: translateY(-1px);
+}
+
+.pill-hover-interactive:active {
+  transform: scale(0.95);
+}
+
+/* Entrance Animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Subtle Shimmer for active processing */
+@keyframes subtleShine {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.animate-subtle-pulse {
+  animation: subtleShine 2s ease-in-out infinite;
+}
+
+/* Laser sweep during processing */
+@keyframes laserSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.animate-laser-sweep {
+  animation: laserSweep 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Tape reel rotation */
+@keyframes spinTape {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-tape {
+  animation: spinTape 4s linear infinite;
+}
+
+/* VU meter bar bounce */
+@keyframes vuBounce {
+  0%, 100% { height: 25%; }
+  50% { height: 95%; }
+}
+
+.animate-vu-1 { animation: vuBounce 0.6s ease-in-out infinite alternate; }
+.animate-vu-2 { animation: vuBounce 0.8s ease-in-out 0.2s infinite alternate; }
+.animate-vu-3 { animation: vuBounce 0.5s ease-in-out 0.4s infinite alternate; }
+.animate-vu-4 { animation: vuBounce 0.7s ease-in-out 0.1s infinite alternate; }
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #070B12;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
