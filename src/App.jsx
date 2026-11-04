@@ -212,29 +212,31 @@ export default function App() {
               </div>
             )}
 
-            {/* CLEAN, PROFESSIONAL EXECUTIVE BUTTON (No flashy neon glow) */}
+            {/* CLEAN, PROFESSIONAL EXECUTIVE BUTTON WITH HOVER SHEEN & ARROW TRANSLATE */}
             <div className="flex justify-center pt-1">
               <button
                 type="button"
                 disabled={!file}
                 onClick={handleStartProcessing}
-                className={`w-full sm:w-auto min-w-[280px] sm:min-w-[340px] px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-sm tracking-wide transition-all flex items-center justify-center space-x-2.5 select-none ${
+                className={`group w-full sm:w-auto min-w-[280px] sm:min-w-[340px] px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-sm tracking-wide transition-all flex items-center justify-center space-x-2.5 select-none ${
                   file
                     ? 'btn-executive-primary cursor-pointer'
                     : 'bg-white/[0.04] text-slate-600 border border-white/[0.06] cursor-not-allowed'
                 }`}
               >
                 {file ? (
-                  <Zap className="w-4 h-4 fill-current" />
+                  <Zap className="w-4 h-4 fill-current group-hover:rotate-12 group-hover:scale-110 transition-transform duration-200" />
                 ) : (
                   <Disc3 className="w-4 h-4 text-slate-600" />
                 )}
 
-                <span>
+                <span className="font-extrabold tracking-wide">
                   {file ? 'Synthesize Executive MOM' : 'Insert Audio To Synthesize'}
                 </span>
 
-                {file && <ArrowRight className="w-4 h-4" />}
+                {file && (
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-200" />
+                )}
               </button>
             </div>
 

@@ -53,10 +53,10 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
           {meetings.map((m) => (
             <div
               key={m.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-black/40 border border-white/[0.05] hover:border-white/[0.12] transition-all gap-3 group"
+              className="card-hover-interactive flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-black/40 border border-white/[0.06] hover:border-white/[0.15] gap-3 group"
             >
               <div className="flex items-start space-x-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.08] text-slate-300 flex items-center justify-center shrink-0 mt-0.5 group-hover:text-[#ff4d5a] transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.08] text-slate-300 flex items-center justify-center shrink-0 mt-0.5 group-hover:text-[#ff4d5a] group-hover:border-[#ff4d5a]/30 transition-all">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
@@ -83,16 +83,16 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
                   href={m.docUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-slate-200 hover:text-white text-xs font-semibold transition-all active:scale-95"
+                  className="group/btn inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-[#ff4d5a] border border-white/[0.08] hover:border-[#ff4d5a] text-slate-200 hover:text-white text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-[#ff4d5a]/25"
                 >
                   <span>Open Doc</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-3 h-3 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
                 </a>
 
                 <button
                   type="button"
                   onClick={() => handleCopySummary(m)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 bg-white/[0.02] hover:bg-white/[0.08] border border-white/[0.06] transition-all active:scale-95"
+                  className="p-2 rounded-xl text-slate-400 hover:text-emerald-400 bg-white/[0.02] hover:bg-emerald-500/10 border border-white/[0.06] hover:border-emerald-500/20 transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
                   title="Copy Slack/WhatsApp formatted summary"
                 >
                   {copiedId === m.id ? (
@@ -106,7 +106,7 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
                   <button
                     type="button"
                     onClick={() => onDelete(m.id)}
-                    className="p-2 rounded-xl text-slate-500 hover:text-rose-400 bg-white/[0.02] hover:bg-rose-500/10 border border-white/[0.06] transition-all active:scale-95"
+                    className="p-2 rounded-xl text-slate-500 hover:text-rose-400 bg-white/[0.02] hover:bg-rose-500/10 border border-white/[0.06] hover:border-rose-500/20 transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
                     title="Remove from history"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

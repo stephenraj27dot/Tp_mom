@@ -81,16 +81,16 @@ export default function ExecutiveDocCard({ result, onReset }) {
           href={docUrl}
           target="_blank"
           rel="noreferrer"
-          className="btn-executive-primary inline-flex items-center justify-center space-x-2 px-6 py-3.5 rounded-2xl font-bold text-sm tracking-wide cursor-pointer text-center"
+          className="group btn-executive-primary inline-flex items-center justify-center space-x-2 px-6 py-3.5 rounded-2xl font-bold text-sm tracking-wide cursor-pointer text-center"
         >
           <span>OPEN IN GOOGLE DOCS</span>
-          <ExternalLink className="w-4 h-4" />
+          <ExternalLink className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-200" />
         </a>
 
         <button
           type="button"
           onClick={copyForTeam}
-          className="inline-flex items-center justify-center space-x-2 px-5 py-3.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-slate-100 text-xs sm:text-sm font-semibold transition-all active:scale-95"
+          className="group btn-executive-secondary inline-flex items-center justify-center space-x-2 px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all active:scale-95"
         >
           {copiedSlack ? (
             <>
@@ -99,7 +99,7 @@ export default function ExecutiveDocCard({ result, onReset }) {
             </>
           ) : (
             <>
-              <MessageSquare className="w-4 h-4 text-slate-300" />
+              <MessageSquare className="w-4 h-4 text-slate-300 group-hover:scale-110 group-hover:text-[#ff4d5a] transition-all" />
               <span>COPY FOR SLACK / WHATSAPP</span>
             </>
           )}

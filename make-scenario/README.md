@@ -30,3 +30,4 @@ flowchart LR
 3. Click the **...** menu in the bottom toolbar -> **Import Blueprint**.
 4. Select `mom-gemini-stt-webhook-blueprint.json`.
 5. Connect your Google account connection for Google Docs and Google Gemini API key.
+

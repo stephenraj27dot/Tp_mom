@@ -265,8 +265,8 @@ export default function AudioConsole({
           <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-40" />
 
           <div className="relative py-12 sm:py-16 md:py-20 px-4 sm:px-6 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
-              <Disc3 className="w-8 h-8 sm:w-10 sm:h-10 text-[#ff4d5a]" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] group-hover:border-[#ff4d5a]/50 group-hover:bg-[#ff4d5a]/10 flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-105 shadow-inner">
+              <Disc3 className="w-8 h-8 sm:w-10 sm:h-10 text-[#ff4d5a] group-hover:rotate-180 transition-transform duration-700 ease-out" />
             </div>
 
             <div className="flex items-center space-x-2 text-[10px] sm:text-xs font-mono tracking-widest text-[#ff4d5a] uppercase font-bold mb-2">
@@ -285,7 +285,7 @@ export default function AudioConsole({
 
             <button
               type="button"
-              className="px-6 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-slate-100 hover:text-white font-medium text-xs sm:text-sm transition-all active:scale-95"
+              className="px-6 py-2.5 rounded-xl bg-white/[0.06] group-hover:bg-[#ff4d5a] border border-white/[0.12] group-hover:border-[#ff4d5a] text-slate-100 group-hover:text-white font-medium text-xs sm:text-sm transition-all duration-200 active:scale-95 shadow-sm group-hover:shadow-md group-hover:shadow-[#ff4d5a]/25"
             >
               Select Audio File
             </button>
@@ -443,7 +443,7 @@ export default function AudioConsole({
               <button
                 type="button"
                 onClick={togglePlay}
-                className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs sm:text-sm font-semibold transition-all active:scale-95"
+                className="group inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-[#ff4d5a] border border-white/[0.1] hover:border-[#ff4d5a] text-white text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-md hover:shadow-[#ff4d5a]/25"
               >
                 {isPlaying ? (
                   <>
@@ -452,7 +452,7 @@ export default function AudioConsole({
                   </>
                 ) : (
                   <>
-                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                    <Play className="w-3.5 h-3.5 fill-current ml-0.5 group-hover:scale-110 transition-transform" />
                     <span>Play Audio</span>
                   </>
                 )}
