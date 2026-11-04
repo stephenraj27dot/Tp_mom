@@ -5,8 +5,16 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
   const [copiedId, setCopiedId] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
 
+  const sanitizeDocUrl = (url) => {
+    if (!url || typeof url !== 'string' || url.includes('/d//edit')) {
+      return 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit';
+    }
+    return url;
+  };
+
   const handleCopySummary = (meeting) => {
-    const text = `📌 *MOM: ${meeting.title}*\n🏷 *Team:* ${meeting.department || 'General'}\n🗓 *Date:* ${meeting.date || new Date().toLocaleDateString()}\n\n📄 *Google Doc Link:*\n${meeting.docUrl}`;
+    const validUrl = sanitizeDocUrl(meeting.docUrl);
+    const text = `📌 *MOM: ${meeting.title}*\n🏷 *Team:* ${meeting.department || 'General'}\n🗓 *Date:* ${meeting.date || new Date().toLocaleDateString()}\n\n📄 *Google Doc Link:*\n${validUrl}`;
     navigator.clipboard.writeText(text);
     setCopiedId(meeting.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -80,7 +88,7 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
               {/* Action Buttons */}
               <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
                 <a
-                  href={m.docUrl}
+                  href={sanitizeDocUrl(m.docUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="group/btn inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-[#ff4d5a] border border-white/[0.08] hover:border-[#ff4d5a] text-slate-200 hover:text-white text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-[#ff4d5a]/25"

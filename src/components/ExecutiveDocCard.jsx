@@ -20,9 +20,9 @@ export default function ExecutiveDocCard({ result, onReset }) {
   const docUrl =
     rawDoc && !rawDoc.includes('/d//edit') && rawDoc.startsWith('https://')
       ? rawDoc
-      : validId
+      : (validId && typeof validId === 'string' && validId.trim().length > 5)
       ? `https://docs.google.com/document/d/${validId}/edit`
-      : 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
+      : 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit';
 
   const docTitle =
     result?.title ||

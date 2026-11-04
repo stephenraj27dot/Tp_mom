@@ -17,12 +17,15 @@
 
 | Resource | Direct Link / Location | Purpose |
 | :--- | :--- | :--- |
+| **Live Vercel Production App** | [tamilpreneurmom.vercel.app](https://tamilpreneurmom.vercel.app/) | Live production web application for the Tamilpreneur team |
+| **Download Project Report (PDF)** | [PROJECT_REPORT.pdf](https://tamilpreneurmom.vercel.app/Tamilpreneur_MOM_Studio_Project_Report.pdf) | Print-ready executive PDF report for TL review |
+| **Interactive Report (HTML)** | [PROJECT_REPORT.html](https://tamilpreneurmom.vercel.app/Tamilpreneur_MOM_Studio_Project_Report.html) | Standalone styled HTML executive report with 1-click print |
 | **GitHub Repository** | [github.com/stephenraj27dot/Tp_mom](https://github.com/stephenraj27dot/Tp_mom.git) | Complete source code, server, UI & Make.com blueprint |
 | **Google Drive Target Folder** | [drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP](https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP) | Master archive folder (`/meeting-audio`) where all Docs are created |
 | **Verified Test Document** | [docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU](https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit) | Live generated Google Doc output from automated pipeline |
 | **Make.com Automation** | [eu1.make.com/2934624/scenarios/7611268/edit](https://eu1.make.com/2934624/scenarios/7611268/edit) | Active 7-node scenario orchestration console |
 | **Live Webhook Endpoint** | `https://hook.eu1.make.com/tdvaw77919n84mzfsx6cm7oxbha45bku` | Instant 0-second HTTP POST trigger |
-| **Local Application Server** | `http://localhost:3001` | Self-contained Express + Vite production server |
+| **Local Application Server** | `http://localhost:3001` | Self-contained Express + Vite local development server |
 | **API Health Check** | `http://localhost:3001/api/health` | Live backend & webhook telemetry endpoint |
 
 ---
@@ -140,7 +143,7 @@ sequenceDiagram
     participant Webhook as Make.com Webhook
     participant Drive as Stephen's Google Drive (/meeting-audio)
     
-    Team->>App: 1. Opens localhost:3001 / Vercel URL
+    Team->>App: 1. Opens tamilpreneurmom.vercel.app
     Team->>App: 2. Drops Meeting Audio (No Drive login needed)
     Team->>App: 3. Selects Department (e.g. Tech & Product)
     Team->>App: 4. Clicks "Synthesize Executive MOM"

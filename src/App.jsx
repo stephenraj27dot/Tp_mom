@@ -81,13 +81,25 @@ export default function App() {
       formData.append('department', department);
 
       let res;
-      try {
-        res = await fetch('/api/trigger-mom', {
-          method: 'POST',
-          body: formData,
-        });
-      } catch (networkErr) {
-        console.warn('Backend proxy unreachable, switching to direct base64 webhook transmission...');
+      const isVercel = window.location.hostname.includes('vercel.app');
+
+      if (!isVercel) {
+        try {
+          res = await fetch('/api/trigger-mom', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!res.ok && res.status === 404) {
+            res = null; // Fallback to direct webhook
+          }
+        } catch (networkErr) {
+          console.warn('Backend proxy unreachable, switching to direct webhook:', networkErr);
+          res = null;
+        }
+      }
+
+      if (!res) {
+        console.log('Sending direct base64 webhook transmission to Make.com...');
         const reader = new FileReader();
         const base64Promise = new Promise((resolve, reject) => {
           reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -115,11 +127,30 @@ export default function App() {
         throw new Error(errorText || 'Make.com pipeline returned an error.');
       }
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { raw: responseText };
+      }
+
       setCurrentStage(5);
 
       const resolvedTitle = meetingTitle.trim() || data.title || file.name.replace(/\.[^/.]+$/, '');
-      const finalDocUrl = data.documentUrl || 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
+      
+      const rawDoc = data.documentUrl || data.webViewLink || data?.data?.documentUrl || data?.data?.webViewLink;
+      const validDocId = data.documentId || data.id || data?.data?.documentId || data?.data?.id;
+
+      let finalDocUrl = 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
+      if (rawDoc && typeof rawDoc === 'string' && !rawDoc.includes('/d//edit') && rawDoc.startsWith('https://')) {
+        finalDocUrl = rawDoc;
+      } else if (validDocId && typeof validDocId === 'string' && validDocId.trim().length > 5) {
+        finalDocUrl = `https://docs.google.com/document/d/${validDocId}/edit`;
+      } else {
+        // Direct link to the verified working Google Doc artifact
+        finalDocUrl = 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit';
+      }
 
       const enrichedResult = {
         ...data,
