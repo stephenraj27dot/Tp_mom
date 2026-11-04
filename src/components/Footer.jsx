@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileDown, ExternalLink, Code2 } from 'lucide-react';
+import { Code2 } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -16,19 +16,12 @@ export default function Footer() {
 
         <div className="flex items-center gap-4 text-[11px] font-mono">
           <a
-            href="/Tamilpreneur_MOM_Studio_Project_Report.pdf"
-            download="Tamilpreneur_MOM_Studio_Project_Report.pdf"
-            className="text-[#ff4d5a] hover:text-[#ff7580] flex items-center gap-1 font-semibold underline"
-          >
-            <FileDown className="w-3.5 h-3.5" /> Download Report (PDF)
-          </a>
-          <a
             href="https://github.com/stephenraj27dot/Tp_mom"
             target="_blank"
             rel="noreferrer"
             className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
           >
-            <Code2 className="w-3.5 h-3.5" /> GitHub
+            <Code2 className="w-3.5 h-3.5 text-[#ff4d5a]" /> GitHub Repo
           </a>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { HardDrive, ExternalLink, FileDown } from 'lucide-react';
+import { HardDrive, ExternalLink } from 'lucide-react';
 
 export default function Header() {
   return (
@@ -35,27 +35,15 @@ export default function Header() {
         </div>
 
         {/* Action Controls & Indicators */}
-        <div className="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
-          {/* TL Project Report Download Button */}
-          <a
-            href="/Tamilpreneur_MOM_Studio_Project_Report.pdf"
-            download="Tamilpreneur_MOM_Studio_Project_Report.pdf"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-[#ff4d5a]/40 bg-[#ff4d5a]/15 hover:bg-[#ff4d5a] text-white font-mono text-[10px] sm:text-[11px] font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-[#ff4d5a]/25 cursor-pointer"
-            title="Download Executive Project Report for TL Review (PDF)"
-          >
-            <FileDown className="w-3.5 h-3.5 text-[#ff4d5a] group-hover:text-white transition-colors" />
-            <span className="hidden sm:inline">TL Report</span>
-            <span className="px-1 py-0.2 rounded bg-black/30 text-[9px] font-bold">PDF</span>
-          </a>
-
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
           {/* Telemetry Indicator */}
-          <div className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-400 font-mono text-[10px] sm:text-[11px] shadow-sm">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-400 font-mono text-[10px] sm:text-[11px] shadow-sm">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
             </span>
-            <span className="hidden md:inline">MAKE.COM ACTIVE</span>
-            <span className="md:hidden font-bold">LIVE</span>
+            <span className="hidden sm:inline">MAKE.COM ACTIVE</span>
+            <span className="sm:hidden font-bold">ONLINE</span>
           </div>
 
           <a
