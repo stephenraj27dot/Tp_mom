@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Check, FileText, RotateCcw, FolderCheck, Sparkles, MessageSquare, CheckCircle2, ListChecks, Calendar, User, AlignLeft } from 'lucide-react';
+import { ExternalLink, Copy, Check, FileText, RotateCcw, FolderCheck, Sparkles, MessageSquare, CheckCircle2, ListChecks, Calendar, User, AlignLeft, Trash2 } from 'lucide-react';
 
-export default function ExecutiveDocCard({ result, onReset }) {
+export default function ExecutiveDocCard({ result, onReset, onDeleteCurrent }) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSlack, setCopiedSlack] = useState(false);
 
@@ -210,16 +210,31 @@ export default function ExecutiveDocCard({ result, onReset }) {
         </div>
       </div>
 
-      {/* Reset control */}
-      <div className="text-center">
+      {/* Action controls */}
+      <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-mono">
         <button
           type="button"
           onClick={onReset}
-          className="inline-flex items-center space-x-2 text-xs font-mono text-slate-400 hover:text-white transition-colors cursor-pointer py-1"
+          className="inline-flex items-center space-x-2 text-slate-300 hover:text-white transition-colors cursor-pointer py-1.5 px-3.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08]"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Ingest another meeting tape</span>
         </button>
+
+        {onDeleteCurrent && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Delete this saved MOM record?')) {
+                onDeleteCurrent();
+              }
+            }}
+            className="inline-flex items-center space-x-1.5 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer py-1.5 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete this MOM</span>
+          </button>
+        )}
       </div>
     </div>
   );

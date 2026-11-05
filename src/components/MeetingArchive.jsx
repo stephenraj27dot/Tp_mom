@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { FileText, ExternalLink, Copy, Check, Trash2, Calendar, Tag, ChevronDown, ChevronUp, Archive } from 'lucide-react';
+import { FileText, ExternalLink, Copy, Check, Trash2, Calendar, Tag, ChevronDown, ChevronUp, Archive, Eye } from 'lucide-react';
 
-export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
+export default function MeetingArchive({ meetings = [], onClear, onDelete, onSelect }) {
   const [copiedId, setCopiedId] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
 
@@ -87,6 +87,17 @@ export default function MeetingArchive({ meetings = [], onClear, onDelete }) {
 
               {/* Action Buttons */}
               <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                {onSelect && (
+                  <button
+                    type="button"
+                    onClick={() => onSelect(m)}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#ff4d5a]/10 hover:bg-[#ff4d5a] border border-[#ff4d5a]/30 hover:border-[#ff4d5a] text-[#ff4d5a] hover:text-white text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-[#ff4d5a]/25 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Record</span>
+                  </button>
+                )}
+
                 <a
                   href={sanitizeDocUrl(m.docUrl)}
                   target="_blank"

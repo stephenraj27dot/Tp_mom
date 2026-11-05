@@ -1,5 +1,5 @@
 import React from 'react';
-import { Code2 } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -14,18 +14,11 @@ export default function Footer() {
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-[11px] font-mono">
-          <a
-            href="https://github.com/stephenraj27dot/Tp_mom"
-            target="_blank"
-            rel="noreferrer"
-            className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
-          >
-            <Code2 className="w-3.5 h-3.5 text-[#ff4d5a]" /> GitHub Repo
-          </a>
+        <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Enterprise Core Team Edition • 100% Confidential</span>
         </div>
       </div>
     </footer>
   );
 }
-

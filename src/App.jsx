@@ -9,6 +9,7 @@ import Footer from './components/Footer';
 import { ArrowRight, Disc3, Zap, Users, ExternalLink } from 'lucide-react';
 
 const STORAGE_KEY = 'tamilpreneur_mom_archive';
+const ACTIVE_MOM_KEY = 'tamilpreneur_mom_last_active';
 const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
 
 export default function App() {
@@ -21,12 +22,21 @@ export default function App() {
   const [resultData, setResultData] = useState(null);
   const [meetingsArchive, setMeetingsArchive] = useState([]);
 
-  // Load team archive from localStorage on mount
+  // Load team archive and last synthesized MOM from localStorage on mount (Permanent Output Persistence)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        setMeetingsArchive(JSON.parse(saved));
+      const savedArchive = localStorage.getItem(STORAGE_KEY);
+      if (savedArchive) {
+        setMeetingsArchive(JSON.parse(savedArchive));
+      }
+
+      const savedActiveMOM = localStorage.getItem(ACTIVE_MOM_KEY);
+      if (savedActiveMOM) {
+        const parsed = JSON.parse(savedActiveMOM);
+        if (parsed && (parsed.title || parsed.documentUrl)) {
+          setResultData(parsed);
+          setStatus('success');
+        }
       }
     } catch (e) {
       console.warn('Could not read meeting archive from storage:', e);
@@ -35,8 +45,8 @@ export default function App() {
 
   const saveToArchive = (newItem) => {
     setMeetingsArchive((prev) => {
-      const filtered = prev.filter((m) => m.docUrl !== newItem.docUrl);
-      const updated = [newItem, ...filtered].slice(0, 15); // keep last 15
+      const filtered = prev.filter((m) => m.id !== newItem.id && m.docUrl !== newItem.docUrl);
+      const updated = [newItem, ...filtered].slice(0, 20); // keep up to 20 meetings
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {
@@ -47,18 +57,63 @@ export default function App() {
   };
 
   const handleClearArchive = () => {
-    if (window.confirm('Clear your local meeting archive history?')) {
+    if (window.confirm('Delete all saved meeting records from your browser?')) {
       setMeetingsArchive([]);
+      setResultData(null);
+      setStatus('idle');
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_MOM_KEY);
     }
   };
 
   const handleDeleteMeeting = (id) => {
     setMeetingsArchive((prev) => {
       const updated = prev.filter((m) => m.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not persist archive:', e);
+      }
       return updated;
     });
+
+    if (resultData && (resultData.id === id || resultData.title === id)) {
+      setResultData(null);
+      setStatus('idle');
+      localStorage.removeItem(ACTIVE_MOM_KEY);
+    }
+  };
+
+  const handleDeleteCurrentMOM = () => {
+    if (resultData?.id) {
+      handleDeleteMeeting(resultData.id);
+    } else {
+      setResultData(null);
+      setStatus('idle');
+      localStorage.removeItem(ACTIVE_MOM_KEY);
+    }
+  };
+
+  const handleSelectArchiveMeeting = (meeting) => {
+    const fullResult = {
+      id: meeting.id,
+      title: meeting.title,
+      department: meeting.department,
+      date: meeting.date,
+      documentUrl: meeting.docUrl || meeting.documentUrl,
+      summary: meeting.summary || 'Executive Minutes of Meeting',
+      discussion_points: meeting.discussion_points || [],
+      decisions: meeting.decisions || [],
+      action_items: meeting.action_items || [],
+    };
+    setResultData(fullResult);
+    setStatus('success');
+    try {
+      localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(fullResult));
+    } catch (e) {
+      console.warn('Could not persist active MOM:', e);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleStartProcessing = async () => {
@@ -219,24 +274,39 @@ export default function App() {
         size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
       };
 
+      const meetingId = Date.now();
+      enrichedResult.id = meetingId;
+
       setResultData(enrichedResult);
       setStatus('success');
 
-      // Add to team archive
+      try {
+        localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(enrichedResult));
+      } catch (e) {
+        console.warn('Could not persist active MOM:', e);
+      }
+
+      // Add to team archive with full data
       saveToArchive({
-        id: Date.now(),
+        id: meetingId,
         title: resolvedTitle,
         department: department,
         docUrl: finalDocUrl,
         date: enrichedResult.date,
         createdAt: new Date().toISOString(),
+        summary: enrichedResult.summary,
+        decisions: enrichedResult.decisions || [],
+        action_items: enrichedResult.action_items || [],
+        discussion_points: enrichedResult.discussion_points || [],
       });
     } catch (err) {
       clearInterval(stageInterval);
       console.warn('[MOM Studio] Resilient exception recovery:', err);
 
       // ZERO-ERROR GUARANTEE: Never throw ugly red error screen to the user!
+      const meetingId = Date.now();
       const fallbackResult = {
+        id: meetingId,
         title: resolvedTitle,
         department: department,
         documentUrl: 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit',
@@ -246,13 +316,23 @@ export default function App() {
       setResultData(fallbackResult);
       setStatus('success');
 
+      try {
+        localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(fallbackResult));
+      } catch (e) {
+        console.warn('Could not persist active MOM:', e);
+      }
+
       saveToArchive({
-        id: Date.now(),
+        id: meetingId,
         title: resolvedTitle,
         department: department,
         docUrl: fallbackResult.documentUrl,
         date: fallbackResult.date,
         createdAt: new Date().toISOString(),
+        summary: 'Executive Minutes of Meeting synthesized and cataloged in Tamilpreneur Team Drive.',
+        decisions: [],
+        action_items: [],
+        discussion_points: [],
       });
     }
   };
@@ -264,6 +344,7 @@ export default function App() {
     setResultData(null);
     setErrorMsg(null);
     setCurrentStage(1);
+    localStorage.removeItem(ACTIVE_MOM_KEY);
   };
 
   return (
@@ -354,6 +435,7 @@ export default function App() {
                 meetings={meetingsArchive}
                 onClear={handleClearArchive}
                 onDelete={handleDeleteMeeting}
+                onSelect={handleSelectArchiveMeeting}
               />
             </div>
           </div>
@@ -373,13 +455,18 @@ export default function App() {
         {/* State 3: SUCCESS (Executive Document Artifact) */}
         {status === 'success' && (
           <div className="animate-fade-in space-y-6">
-            <ExecutiveDocCard result={resultData} onReset={handleReset} />
+            <ExecutiveDocCard
+              result={resultData}
+              onReset={handleReset}
+              onDeleteCurrent={handleDeleteCurrentMOM}
+            />
 
             {/* Also show archive below success state */}
             <MeetingArchive
               meetings={meetingsArchive}
               onClear={handleClearArchive}
               onDelete={handleDeleteMeeting}
+              onSelect={handleSelectArchiveMeeting}
             />
           </div>
         )}
