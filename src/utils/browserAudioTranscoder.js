@@ -9,6 +9,9 @@ import { OggOpusDecoder } from 'ogg-opus-decoder';
  */
 
 export function encodeChannelDataToWav(channelData, sampleRate) {
+  if (!channelData || !channelData.length || !channelData[0] || !channelData[0].length) {
+    return null;
+  }
   const numChannels = channelData.length;
   const numSamples = channelData[0].length;
   const bytesPerSample = 2; // 16-bit PCM
@@ -61,6 +64,9 @@ export function encodeChannelDataToWav(channelData, sampleRate) {
 }
 
 export function extractPeaksFromChannelData(channelData, count = 64) {
+  if (!channelData || !channelData.length || !channelData[0] || !channelData[0].length) {
+    return Array.from({ length: count }, () => 0.3);
+  }
   const raw = channelData[0];
   const block = Math.max(1, Math.floor(raw.length / count));
   const peaks = [];
@@ -90,34 +96,46 @@ export async function transcodeAudioInBrowser(file) {
 
   const nameLower = file.name.toLowerCase();
   const ext = (file.name.split('.').pop() || '').toLowerCase();
+  
+  // Read first 16 bytes to detect container format directly
+  const arrayBuffer = await file.arrayBuffer();
+  const headerBytes = new Uint8Array(arrayBuffer.slice(0, 16));
+  const headerAscii = String.fromCharCode(...headerBytes.slice(0, 4));
+  
+  const isOggHeader = headerAscii === 'OggS';
   const isOpusOrWhatsApp =
+    isOggHeader ||
     nameLower.includes('whatsapp') ||
     ext === 'opus' ||
     ext === 'ogg' ||
     file.type?.includes('opus') ||
     file.type?.includes('ogg');
 
-  // Strategy 1: For WhatsApp & Opus files, use WASM OggOpusDecoder
+  // Strategy 1: WASM OggOpusDecoder (Official libopus WebAssembly)
   if (isOpusOrWhatsApp) {
     try {
+      console.log('[AudioTranscoder] Decoding WhatsApp/Opus audio via WASM libopus...');
       const decoder = new OggOpusDecoder();
       await decoder.ready;
-      const arrayBuffer = await file.arrayBuffer();
       const uint8Bytes = new Uint8Array(arrayBuffer);
-      const { channelData, samplesDecoded, sampleRate } = await decoder.decode(uint8Bytes);
+      const res = await decoder.decodeFile(uint8Bytes);
       decoder.free();
 
+      const { channelData, samplesDecoded, sampleRate } = res;
       if (channelData && channelData.length > 0 && samplesDecoded > 0) {
+        console.log(`[AudioTranscoder] WASM decoded ${samplesDecoded} samples @ ${sampleRate}Hz successfully!`);
         const wavBlob = encodeChannelDataToWav(channelData, sampleRate);
-        const peaks = extractPeaksFromChannelData(channelData, 64);
-        const duration = samplesDecoded / sampleRate;
+        if (wavBlob) {
+          const peaks = extractPeaksFromChannelData(channelData, 64);
+          const duration = samplesDecoded / sampleRate;
 
-        return {
-          success: true,
-          wavBlob,
-          duration,
-          peaks,
-        };
+          return {
+            success: true,
+            wavBlob,
+            duration,
+            peaks,
+          };
+        }
       }
     } catch (opusErr) {
       console.warn('[AudioTranscoder] WASM Opus decode error, trying Web Audio API:', opusErr);
@@ -129,7 +147,6 @@ export async function transcodeAudioInBrowser(file) {
   if (AudioCtx) {
     const ctx = new AudioCtx();
     try {
-      const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await new Promise((resolve, reject) => {
         ctx.decodeAudioData(arrayBuffer.slice(0), resolve, reject);
       });
@@ -140,14 +157,15 @@ export async function transcodeAudioInBrowser(file) {
       }
 
       const wavBlob = encodeChannelDataToWav(channelData, audioBuffer.sampleRate);
-      const peaks = extractPeaksFromChannelData(channelData, 64);
-
-      return {
-        success: true,
-        wavBlob,
-        duration: audioBuffer.duration,
-        peaks,
-      };
+      if (wavBlob) {
+        const peaks = extractPeaksFromChannelData(channelData, 64);
+        return {
+          success: true,
+          wavBlob,
+          duration: audioBuffer.duration,
+          peaks,
+        };
+      }
     } catch (webAudioErr) {
       console.warn('[AudioTranscoder] Web Audio API fallback:', webAudioErr);
     } finally {
@@ -159,11 +177,11 @@ export async function transcodeAudioInBrowser(file) {
 
   // Strategy 3: Wrap with proper MIME type if all decoders fail
   let mimeType = 'audio/mpeg';
-  if (ext === 'ogg' || ext === 'opus') mimeType = 'audio/ogg; codecs=opus';
+  if (isOggHeader || ext === 'ogg' || ext === 'opus') mimeType = 'audio/ogg; codecs=opus';
   else if (ext === 'wav') mimeType = 'audio/wav';
   else if (ext === 'm4a' || ext === 'aac') mimeType = 'audio/mp4';
 
-  const fixedBlob = new Blob([file], { type: mimeType });
+  const fixedBlob = new Blob([arrayBuffer], { type: mimeType });
   return {
     success: false,
     fixedBlob,
