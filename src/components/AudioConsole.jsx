@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, X, Disc3, Radio, Volume2, VolumeX, Loader2, Edit3, Tag } from 'lucide-react';
+import { transcodeAudioInBrowser } from '../utils/browserAudioTranscoder';
 
 const DEPARTMENTS = [
   { id: 'General', label: 'General', icon: '🏢' },
@@ -78,7 +79,7 @@ export default function AudioConsole({
     setIsDecoding(false);
   };
 
-  // ── Auto-transcode WhatsApp/AAC/Opus for 100% sound ───────────────────────────
+  // ── Universal In-Browser Transcoder & Player Engine ───────────────────────────
   useEffect(() => {
     if (!file) {
       setAudioUrl(null);
@@ -91,10 +92,7 @@ export default function AudioConsole({
     }
 
     let isCancelled = false;
-    let activeUrl = URL.createObjectURL(file);
-    setAudioUrl(activeUrl);
-    setIsPlaying(false);
-    setCurrentTime(0);
+    let activeUrl = null;
 
     // Auto set a clean default title if blank
     if (!title && onTitleChange) {
@@ -106,43 +104,44 @@ export default function AudioConsole({
       onTitleChange(cleanName || 'Tamilpreneur Meeting');
     }
 
-    const nameLower = file.name.toLowerCase();
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
-    const isWhatsAppOrNonStandard =
-      nameLower.includes('whatsapp') ||
-      ['aac', 'opus', 'ogg', 'm4a', 'amr', 'webm'].includes(ext);
-
-    const transcodeToMp3 = async () => {
+    const processAudio = async () => {
       try {
         setIsOptimizing(true);
-        const formData = new FormData();
-        formData.append('audio', file);
 
-        const res = await fetch('/api/transcode', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) throw new Error('Transcode server failed');
-        const mp3Blob = await res.blob();
+        // Client-Side Web Audio Transcoding (Zero server dependency, 100% Vercel compatible)
+        const res = await transcodeAudioInBrowser(file);
         if (isCancelled) return;
 
-        URL.revokeObjectURL(activeUrl);
-        activeUrl = URL.createObjectURL(mp3Blob);
+        if (res.success && res.wavBlob) {
+          if (activeUrl) URL.revokeObjectURL(activeUrl);
+          activeUrl = URL.createObjectURL(res.wavBlob);
+          setAudioUrl(activeUrl);
+          setWavePeaks(res.peaks || []);
+          if (res.duration) setDuration(res.duration);
+          return;
+        }
+
+        // Heavy files (>30MB): Direct blob URL with synthetic waveform
+        if (activeUrl) URL.revokeObjectURL(activeUrl);
+        activeUrl = URL.createObjectURL(file);
         setAudioUrl(activeUrl);
-        decodeWaveform(mp3Blob);
-      } catch (err) {
-        console.warn('[AudioConsole] Transcode fallback:', err);
+        if (res.isHeavy) {
+          generateSynthPeaks();
+        } else {
+          decodeWaveform(file);
+        }
+      } catch {
+        if (isCancelled) return;
+        if (activeUrl) URL.revokeObjectURL(activeUrl);
+        activeUrl = URL.createObjectURL(file);
+        setAudioUrl(activeUrl);
+        decodeWaveform(file);
       } finally {
         if (!isCancelled) setIsOptimizing(false);
       }
     };
 
-    if (isWhatsAppOrNonStandard) {
-      transcodeToMp3();
-    } else {
-      decodeWaveform(file);
-    }
+    processAudio();
 
     return () => {
       isCancelled = true;

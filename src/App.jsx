@@ -124,6 +124,22 @@ export default function App() {
             try {
               console.log('[MOM Studio] Calling Direct Google Gemini AI...');
               const gKey = ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
+
+              const ext = (file.name.split('.').pop() || '').toLowerCase();
+              let cleanMime = 'audio/mp3';
+              if (file.type && file.type.startsWith('audio/')) {
+                cleanMime = file.type;
+              } else if (ext === 'wav') {
+                cleanMime = 'audio/wav';
+              } else if (ext === 'ogg' || ext === 'opus') {
+                cleanMime = 'audio/ogg';
+              } else if (ext === 'm4a' || ext === 'aac') {
+                cleanMime = 'audio/aac';
+              } else if (ext === 'mp3') {
+                cleanMime = 'audio/mp3';
+              }
+              if (cleanMime === 'audio/opus') cleanMime = 'audio/ogg';
+
               const geminiRes = await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${gKey}`,
                 {
@@ -138,7 +154,7 @@ export default function App() {
                           },
                           {
                             inlineData: {
-                              mimeType: file.type?.startsWith('audio/') ? file.type : 'audio/mp3',
+                              mimeType: cleanMime,
                               data: base64Data
                             }
                           }

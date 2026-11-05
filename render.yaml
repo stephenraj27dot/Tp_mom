@@ -3,16 +3,14 @@ services:
     name: tamilpreneur-mom-api
     runtime: node
     plan: free
-    region: singapore
-    buildCommand: npm install && npm run build
+    region: frankfurt
+    buildCommand: npm install
     startCommand: node server.js
-    healthCheckPath: /api/health
-    autoDeploy: true
     envVars:
+      - key: PORT
+        value: 3001
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: GEMINI_API_KEY
         sync: false
       - key: MAKE_WEBHOOK_URL
