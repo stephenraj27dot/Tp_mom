@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, X, Disc3, Radio, Volume2, VolumeX, Loader2, Edit3, Tag } from 'lucide-react';
 import { transcodeAudioInBrowser } from '../utils/browserAudioTranscoder';
 
+const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+
 const DEPARTMENTS = [
   { id: 'General', label: 'General', icon: '🏢' },
   { id: 'Tech & Product', label: 'Tech & Product', icon: '🚀' },
@@ -50,7 +52,23 @@ export default function AudioConsole({
         return;
       }
       const ctx = new AudioCtx();
-      const audioBuf = await ctx.decodeAudioData(ab.slice(0));
+      let audioBuf = null;
+      try {
+        audioBuf = await new Promise((resolve, reject) => {
+          ctx.decodeAudioData(ab.slice(0), resolve, reject);
+        });
+      } catch {
+        generateSynthPeaks();
+        return;
+      } finally {
+        if (ctx.state !== 'closed') ctx.close().catch(() => {});
+      }
+
+      if (!audioBuf) {
+        generateSynthPeaks();
+        return;
+      }
+
       const raw = audioBuf.getChannelData(0);
       const count = 64;
       const block = Math.floor(raw.length / count);
@@ -107,11 +125,37 @@ export default function AudioConsole({
       onTitleChange(cleanName || 'Tamilpreneur Meeting');
     }
 
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
     const processAudio = async () => {
       try {
         setIsOptimizing(true);
 
-        // Client-Side WASM + Web Audio Transcoding (Zero server dependency, 100% Vercel compatible)
+        // Path A: Localhost / Cloud Node Server with FFmpeg (100% Guaranteed conversion to MP3 for any format)
+        if (isLocal || API_BASE) {
+          try {
+            console.log('[AudioConsole] Backend detected, transcoding via FFmpeg...');
+            const formData = new FormData();
+            formData.append('audio', file);
+            const res = await fetch(`${API_BASE}/api/transcode`, {
+              method: 'POST',
+              body: formData,
+            });
+            if (res.ok) {
+              const mp3Blob = await res.blob();
+              if (isCancelled) return;
+              URL.revokeObjectURL(activeUrl);
+              activeUrl = URL.createObjectURL(mp3Blob);
+              setAudioUrl(activeUrl);
+              decodeWaveform(mp3Blob);
+              return;
+            }
+          } catch (localErr) {
+            console.warn('[AudioConsole] Local transcode fallback:', localErr);
+          }
+        }
+
+        // Path B: Client-Side WASM + Web Audio Transcoding (For Cloud / Vercel)
         const res = await transcodeAudioInBrowser(file);
         if (isCancelled) return;
 
