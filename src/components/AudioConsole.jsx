@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, X, Disc3, Radio, Volume2, VolumeX, Loader2, Edit3, Tag } from 'lucide-react';
 import { transcodeAudioInBrowser } from '../utils/browserAudioTranscoder';
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
 
 const DEPARTMENTS = [
   { id: 'General', label: 'General', icon: '🏢' },
@@ -134,10 +134,11 @@ export default function AudioConsole({
         // Path A: Localhost / Cloud Node Server with FFmpeg (100% Guaranteed conversion to MP3 for any format)
         if (isLocal || API_BASE) {
           try {
-            console.log('[AudioConsole] Backend detected, transcoding via FFmpeg...');
+            console.log('[AudioConsole] FFmpeg Backend detected, transcoding audio...');
             const formData = new FormData();
             formData.append('audio', file);
-            const res = await fetch(`${API_BASE}/api/transcode`, {
+            const endpoint = isLocal ? '/api/transcode' : `${API_BASE}/api/transcode`;
+            const res = await fetch(endpoint, {
               method: 'POST',
               body: formData,
             });
@@ -151,7 +152,7 @@ export default function AudioConsole({
               return;
             }
           } catch (localErr) {
-            console.warn('[AudioConsole] Local transcode fallback:', localErr);
+            console.warn('[AudioConsole] FFmpeg transcode fallback:', localErr);
           }
         }
 

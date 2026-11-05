@@ -9,7 +9,7 @@ import Footer from './components/Footer';
 import { ArrowRight, Disc3, Zap, Users, ExternalLink } from 'lucide-react';
 
 const STORAGE_KEY = 'tamilpreneur_mom_archive';
-const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
 
 export default function App() {
   const [file, setFile] = useState(null);
