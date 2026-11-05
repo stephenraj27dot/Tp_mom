@@ -92,7 +92,10 @@ export default function AudioConsole({
     }
 
     let isCancelled = false;
-    let activeUrl = null;
+    let activeUrl = URL.createObjectURL(file);
+    setAudioUrl(activeUrl);
+    setIsPlaying(false);
+    setCurrentTime(0);
 
     // Auto set a clean default title if blank
     if (!title && onTitleChange) {
@@ -108,12 +111,12 @@ export default function AudioConsole({
       try {
         setIsOptimizing(true);
 
-        // Client-Side Web Audio Transcoding (Zero server dependency, 100% Vercel compatible)
+        // Client-Side WASM + Web Audio Transcoding (Zero server dependency, 100% Vercel compatible)
         const res = await transcodeAudioInBrowser(file);
         if (isCancelled) return;
 
         if (res.success && res.wavBlob) {
-          if (activeUrl) URL.revokeObjectURL(activeUrl);
+          URL.revokeObjectURL(activeUrl);
           activeUrl = URL.createObjectURL(res.wavBlob);
           setAudioUrl(activeUrl);
           setWavePeaks(res.peaks || []);
@@ -121,20 +124,19 @@ export default function AudioConsole({
           return;
         }
 
-        // Heavy files (>30MB): Direct blob URL with synthetic waveform
-        if (activeUrl) URL.revokeObjectURL(activeUrl);
-        activeUrl = URL.createObjectURL(file);
+        // Heavy files or MIME-fixed fallback
+        const fallback = res.fixedBlob || file;
+        URL.revokeObjectURL(activeUrl);
+        activeUrl = URL.createObjectURL(fallback);
         setAudioUrl(activeUrl);
         if (res.isHeavy) {
           generateSynthPeaks();
         } else {
-          decodeWaveform(file);
+          decodeWaveform(fallback);
         }
-      } catch {
+      } catch (err) {
+        console.warn('[AudioConsole] Transcode fallback:', err);
         if (isCancelled) return;
-        if (activeUrl) URL.revokeObjectURL(activeUrl);
-        activeUrl = URL.createObjectURL(file);
-        setAudioUrl(activeUrl);
         decodeWaveform(file);
       } finally {
         if (!isCancelled) setIsOptimizing(false);
@@ -148,6 +150,13 @@ export default function AudioConsole({
       if (activeUrl) URL.revokeObjectURL(activeUrl);
     };
   }, [file]);
+
+  // Prime audio element whenever audioUrl changes
+  useEffect(() => {
+    if (audioRef.current && audioUrl) {
+      audioRef.current.load();
+    }
+  }, [audioUrl]);
 
   const handleLoadedMetadata = () => {
     const a = audioRef.current;

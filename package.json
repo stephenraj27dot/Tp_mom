@@ -16,6 +16,7 @@
     "express": "^4.21.2",
     "lucide-react": "^1.16.0",
     "multer": "^1.4.5-lts.1",
+    "ogg-opus-decoder": "^1.7.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.0.2"
@@ -28,4 +29,3 @@
     "vite": "^6.2.0"
   }
 }
-

@@ -1,25 +1,21 @@
+import { OggOpusDecoder } from 'ogg-opus-decoder';
+
 /**
- * In-Browser Audio Transcoder & Waveform Engine
+ * Universal In-Browser Audio Transcoder & Waveform Engine
  * -------------------------------------------------------------
- * Decodes Opus, OGG, WhatsApp voice notes, AAC, M4A, AMR, WebM
- * in pure client-side Web Audio API and converts to a universal 
- * 16-bit PCM WAV Blob.
- * 
- * Works 100% on Vercel static deployments without any backend server.
+ * Decodes WhatsApp voice notes (.opus / .ogg) using WASM libopus
+ * and standard audio formats using Web Audio API into universal
+ * 16-bit PCM WAV Blobs for 100% crystal-clear browser playback.
  */
 
-export function audioBufferToWav(buffer) {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // 1 = PCM
-  const bitDepth = 16;
-  const numSamples = buffer.length;
-  const bytesPerSample = bitDepth / 8;
+export function encodeChannelDataToWav(channelData, sampleRate) {
+  const numChannels = channelData.length;
+  const numSamples = channelData[0].length;
+  const bytesPerSample = 2; // 16-bit PCM
   const blockAlign = numChannels * bytesPerSample;
   const byteRate = sampleRate * blockAlign;
   const dataSize = numSamples * blockAlign;
-  const headerSize = 44;
-  const totalSize = headerSize + dataSize;
+  const totalSize = 44 + dataSize;
 
   const arrayBuffer = new ArrayBuffer(totalSize);
   const view = new DataView(arrayBuffer);
@@ -30,38 +26,31 @@ export function audioBufferToWav(buffer) {
     }
   };
 
-  // RIFF header
+  // RIFF identifier
   writeString(0, 'RIFF');
   view.setUint32(4, 36 + dataSize, true);
   writeString(8, 'WAVE');
 
-  // "fmt " sub-chunk
+  // fmt sub-chunk
   writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-  view.setUint16(20, format, true); // AudioFormat
-  view.setUint16(22, numChannels, true); // NumChannels
-  view.setUint32(24, sampleRate, true); // SampleRate
-  view.setUint32(28, byteRate, true); // ByteRate
-  view.setUint16(32, blockAlign, true); // BlockAlign
-  view.setUint16(34, bitDepth, true); // BitsPerSample
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // 1 = PCM
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); // 16-bit
 
-  // "data" sub-chunk
+  // data sub-chunk
   writeString(36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Write PCM audio data (interleaved channels)
+  // Write PCM samples (interleaved, clamped, 16-bit)
   let offset = 44;
-  const channels = [];
-  for (let c = 0; c < numChannels; c++) {
-    channels.push(buffer.getChannelData(c));
-  }
-
   for (let i = 0; i < numSamples; i++) {
     for (let c = 0; c < numChannels; c++) {
-      let sample = channels[c][i];
-      // Clamp between -1.0 and 1.0
+      let sample = channelData[c][i];
       sample = Math.max(-1, Math.min(1, sample));
-      // Convert float [-1.0, 1.0] to 16-bit signed integer [-32768, 32767]
       const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
       view.setInt16(offset, intSample, true);
       offset += 2;
@@ -71,8 +60,8 @@ export function audioBufferToWav(buffer) {
   return new Blob([arrayBuffer], { type: 'audio/wav' });
 }
 
-export function extractPeaksFromBuffer(buffer, count = 64) {
-  const raw = buffer.getChannelData(0);
+export function extractPeaksFromChannelData(channelData, count = 64) {
+  const raw = channelData[0];
   const block = Math.max(1, Math.floor(raw.length / count));
   const peaks = [];
 
@@ -91,38 +80,93 @@ export function extractPeaksFromBuffer(buffer, count = 64) {
 }
 
 /**
- * Transcodes any audio file into a 100% browser-playable WAV file
- * and extracts waveform peaks in a single pass.
+ * Transcodes any audio file into standard WAV in the browser.
  */
 export async function transcodeAudioInBrowser(file) {
-  // Heavy file safeguard: Skip full in-memory decode if > 30MB
-  if (file.size > 30 * 1024 * 1024) {
+  // Heavy file guard (> 35MB)
+  if (file.size > 35 * 1024 * 1024) {
     return { isHeavy: true };
   }
 
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) {
-    throw new Error('Web Audio API not supported in this browser');
-  }
+  const nameLower = file.name.toLowerCase();
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const isOpusOrWhatsApp =
+    nameLower.includes('whatsapp') ||
+    ext === 'opus' ||
+    ext === 'ogg' ||
+    file.type?.includes('opus') ||
+    file.type?.includes('ogg');
 
-  const ctx = new AudioCtx();
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  // Strategy 1: For WhatsApp & Opus files, use WASM OggOpusDecoder
+  if (isOpusOrWhatsApp) {
+    try {
+      const decoder = new OggOpusDecoder();
+      await decoder.ready;
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Bytes = new Uint8Array(arrayBuffer);
+      const { channelData, samplesDecoded, sampleRate } = await decoder.decode(uint8Bytes);
+      decoder.free();
 
-    const peaks = extractPeaksFromBuffer(audioBuffer, 64);
-    const wavBlob = audioBufferToWav(audioBuffer);
-    const duration = audioBuffer.duration;
+      if (channelData && channelData.length > 0 && samplesDecoded > 0) {
+        const wavBlob = encodeChannelDataToWav(channelData, sampleRate);
+        const peaks = extractPeaksFromChannelData(channelData, 64);
+        const duration = samplesDecoded / sampleRate;
 
-    return {
-      success: true,
-      wavBlob,
-      duration,
-      peaks,
-    };
-  } finally {
-    if (ctx.state !== 'closed') {
-      ctx.close().catch(() => {});
+        return {
+          success: true,
+          wavBlob,
+          duration,
+          peaks,
+        };
+      }
+    } catch (opusErr) {
+      console.warn('[AudioTranscoder] WASM Opus decode error, trying Web Audio API:', opusErr);
     }
   }
+
+  // Strategy 2: Web Audio API (for MP3, standard WAV, AAC, M4A)
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (AudioCtx) {
+    const ctx = new AudioCtx();
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await new Promise((resolve, reject) => {
+        ctx.decodeAudioData(arrayBuffer.slice(0), resolve, reject);
+      });
+
+      const channelData = [];
+      for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+        channelData.push(audioBuffer.getChannelData(c));
+      }
+
+      const wavBlob = encodeChannelDataToWav(channelData, audioBuffer.sampleRate);
+      const peaks = extractPeaksFromChannelData(channelData, 64);
+
+      return {
+        success: true,
+        wavBlob,
+        duration: audioBuffer.duration,
+        peaks,
+      };
+    } catch (webAudioErr) {
+      console.warn('[AudioTranscoder] Web Audio API fallback:', webAudioErr);
+    } finally {
+      if (ctx.state !== 'closed') {
+        ctx.close().catch(() => {});
+      }
+    }
+  }
+
+  // Strategy 3: Wrap with proper MIME type if all decoders fail
+  let mimeType = 'audio/mpeg';
+  if (ext === 'ogg' || ext === 'opus') mimeType = 'audio/ogg; codecs=opus';
+  else if (ext === 'wav') mimeType = 'audio/wav';
+  else if (ext === 'm4a' || ext === 'aac') mimeType = 'audio/mp4';
+
+  const fixedBlob = new Blob([file], { type: mimeType });
+  return {
+    success: false,
+    fixedBlob,
+    isFallback: true
+  };
 }
