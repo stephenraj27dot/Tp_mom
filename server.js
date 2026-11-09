@@ -9,9 +9,8 @@ import { execFile } from 'child_process';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
-const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/tdvaw77919n84mzfsx6cm7oxbha45bku';
+const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL || 'https://hook.us2.make.com/p4th5g6a6x32d5lhbbm985szmi8onggk';
 const TARGET_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
-const VERIFIED_DOC_URL = 'https://docs.google.com/document/d/1v0L9I6qEHtReAEkk5BVDXOjZUQUozCcNw1_RBhunXDU/edit';
 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
@@ -90,7 +89,7 @@ app.post('/api/transcode', upload.single('audio'), async (req, res) => {
 
 // Helper: Call Google Gemini Direct API with Audio
 async function processWithDirectGemini(audioBuffer, mimeType, meetingTitle, department) {
-  const models = ['gemini-3-flash-preview', 'gemini-flash-lite-latest'];
+  const models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
   const base64Audio = audioBuffer.toString('base64');
   const cleanMime = mimeType?.startsWith('audio/') ? mimeType : 'audio/mp3';
 
@@ -249,13 +248,13 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
     const resolvedTitle = title || geminiData?.title || makeResponseData?.title || file.originalname.replace(/\.[^/.]+$/, '');
     const resolvedDate = date || geminiData?.date || makeResponseData?.date || new Date().toISOString().split('T')[0];
 
-    // Determine clean doc URL
+    // Determine clean doc URL (never fallback to trashed or placeholder IDs)
     const rawUrl = makeResponseData?.documentUrl || makeResponseData?.webViewLink;
-    const cleanDocUrl = (rawUrl && !rawUrl.includes('/d//edit') && rawUrl.startsWith('https://'))
+    const cleanDocUrl = (rawUrl && !rawUrl.includes('/d//edit') && !rawUrl.includes('1v0L9I6q') && rawUrl.startsWith('https://'))
       ? rawUrl
       : (makeResponseData?.id || makeResponseData?.documentId)
       ? `https://docs.google.com/document/d/${makeResponseData.id || makeResponseData.documentId}/edit`
-      : VERIFIED_DOC_URL;
+      : null;
 
     return res.json({
       success: true,
@@ -279,7 +278,7 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
       title: req.body?.title || 'Minutes of Meeting',
       department: req.body?.department || 'General',
       date: new Date().toISOString().split('T')[0],
-      documentUrl: VERIFIED_DOC_URL,
+      documentUrl: null,
       folderUrl: TARGET_DRIVE_FOLDER,
       message: 'Processed and cataloged in Tamilpreneur Team Drive folder.'
     });
