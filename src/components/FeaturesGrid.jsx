@@ -10,10 +10,10 @@ export default function FeaturesGrid() {
       tag: 'SPEECH-TO-TEXT',
     },
     {
-      title: 'Zero Polling Webhook',
-      desc: 'Bypasses the 15-minute Google Drive polling delay. Executes your Make.com workflow in real time with 1 click.',
+      title: 'Zero Make.com Credits',
+      desc: 'Powered directly by Google Gemini AI API with zero Make.com dependency, zero monthly ops limits, and instant turnaround.',
       icon: Zap,
-      tag: 'INSTANT EXECUTION',
+      tag: '100% DIRECT AI',
     },
     {
       title: 'Actionable MOM Parsing',

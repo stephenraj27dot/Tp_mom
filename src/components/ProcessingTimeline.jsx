@@ -5,14 +5,14 @@ export default function ProcessingTimeline({ currentStage, error }) {
   const stages = [
     {
       id: 1,
-      title: 'Payload Transmission',
-      desc: 'Transmitting audio to Make.com webhook pipeline',
+      title: 'Direct Audio Ingestion',
+      desc: 'Transmitting and preparing audio payload for Google Gemini AI',
       icon: Cloud,
     },
     {
       id: 2,
-      title: 'Gemini 3.5 Transcription',
-      desc: 'Processing high-accuracy STT and speaker identification',
+      title: 'Gemini Speech Intelligence',
+      desc: 'Transcribing speech turns with multi-speaker diarization',
       icon: Mic,
     },
     {
@@ -23,8 +23,8 @@ export default function ProcessingTimeline({ currentStage, error }) {
     },
     {
       id: 4,
-      title: 'Google Docs Auto-Sync',
-      desc: 'Formatting executive document into your Google Drive folder',
+      title: 'Executive Artifact Synthesis',
+      desc: 'Formatting executive minutes ready for instant export & sync',
       icon: FileCheck,
     },
   ];
@@ -35,10 +35,10 @@ export default function ProcessingTimeline({ currentStage, error }) {
         <div>
           <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
             <Loader2 className="w-5 h-5 text-[#ff4d5a] animate-spin" />
-            Executing MOM Pipeline
+            Executing Direct AI Pipeline
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Real-time Make.com scenario execution in progress
+            Direct Google Gemini AI processing (Zero Make.com credits required)
           </p>
         </div>
 

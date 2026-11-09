@@ -162,10 +162,10 @@ export default function App() {
         }
       }
 
-      // Path 2: Vercel Cloud Serverless Execution
-      if (isVercel) {
+      // Path 2: Direct Client-Side Gemini AI Engine (Instant, Zero Server or Make Dependency)
+      if (isVercel || !data.summary) {
         if (!isHeavy) {
-          // Standard audio file: Direct Gemini 3 Flash AI Call + Make.com Webhook
+          // Standard audio file: 100% Direct Google Gemini AI (Zero Make.com credits)
           try {
             const reader = new FileReader();
             const base64Promise = new Promise((resolve, reject) => {
@@ -195,7 +195,7 @@ export default function App() {
               }
               if (cleanMime === 'audio/opus') cleanMime = 'audio/ogg';
 
-              const fallbackModels = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
+              const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
               for (const mdl of fallbackModels) {
                 try {
                   const geminiRes = await fetch(
@@ -241,32 +241,6 @@ export default function App() {
               }
             } catch (gErr) {
               console.warn('[MOM Studio] Direct Gemini client-side fallback:', gErr);
-            }
-
-            // Also forward to Make.com Webhook in background
-            try {
-              const makeRes = await fetch('https://hook.us2.make.com/p4th5g6a6x32d5lhbbm985szmi8onggk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  file_data: base64Data,
-                  file_name: file.name,
-                  title: meetingTitle ? `[${department}] ${meetingTitle}` : '',
-                  department: department,
-                  summary: data.summary || '',
-                  discussion_points: data.discussion_points || [],
-                  decisions: data.decisions || [],
-                  action_items: data.action_items || [],
-                }),
-              });
-              if (makeRes.ok) {
-                const makeJson = await makeRes.json();
-                if (makeJson.documentUrl && !makeJson.documentUrl.includes('1v0L9I6q')) {
-                  finalDocUrl = makeJson.documentUrl;
-                }
-              }
-            } catch (webhookErr) {
-              console.warn('[MOM Studio] Cloud webhook resilient fallback:', webhookErr);
             }
           } catch (clientErr) {
             console.warn('[MOM Studio] Client-side processing fallback:', clientErr);

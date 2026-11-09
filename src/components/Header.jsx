@@ -42,7 +42,7 @@ export default function Header() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
             </span>
-            <span className="hidden sm:inline">MAKE.COM ACTIVE</span>
+            <span className="hidden sm:inline">DIRECT AI ENGINE ACTIVE</span>
             <span className="sm:hidden font-bold">ONLINE</span>
           </div>
 

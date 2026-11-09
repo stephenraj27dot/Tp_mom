@@ -9,7 +9,6 @@ import { execFile } from 'child_process';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
-const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL || 'https://hook.us2.make.com/p4th5g6a6x32d5lhbbm985szmi8onggk';
 const TARGET_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
 
 app.use(cors());
@@ -37,7 +36,7 @@ app.use(express.static('dist'));
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    engine: 'Direct Gemini 3 Flash AI + Make Webhook Hybrid',
+    engine: 'Direct Google Gemini AI Engine (Zero Make Credits)',
     capacity: '2.0 GB',
     timestamp: new Date()
   });
@@ -89,7 +88,7 @@ app.post('/api/transcode', upload.single('audio'), async (req, res) => {
 
 // Helper: Call Google Gemini Direct API with Audio
 async function processWithDirectGemini(audioBuffer, mimeType, meetingTitle, department) {
-  const models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3-flash-preview', 'gemini-flash-lite-latest'];
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
   const base64Audio = audioBuffer.toString('base64');
   const cleanMime = mimeType?.startsWith('audio/') ? mimeType : 'audio/mp3';
 
@@ -212,7 +211,7 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
       finalBuffer = await fs.promises.readFile(file.path);
     }
 
-    // Step 1: Direct Real-Time Gemini AI Processing (Zero Make.com quota dependency!)
+    // Direct Real-Time Gemini AI Processing (Zero Make.com credits required!)
     let geminiData = null;
     try {
       geminiData = await processWithDirectGemini(finalBuffer, 'audio/mp3', title, department);
@@ -220,55 +219,22 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
       console.warn('[MOM Studio] Direct Gemini processing exception:', gErr.message);
     }
 
-    // Step 2: Also attempt Make.com Webhook if available
-    let makeResponseData = {};
-    try {
-      const fileBase64 = finalBuffer.toString('base64');
-      const formattedTitle = title
-        ? (department && department !== 'General' ? `[${department}] ${title}` : title)
-        : '';
-
-      const makeRes = await fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_data: fileBase64,
-          file_name: finalFileName,
-          title: formattedTitle,
-          date: date,
-          department: department
-        })
-      });
-      const txt = await makeRes.text();
-      try { makeResponseData = JSON.parse(txt); } catch { makeResponseData = { raw: txt }; }
-    } catch (mErr) {
-      console.log('[MOM Studio] Make.com background webhook bypassed:', mErr.message);
-    }
-
-    const resolvedTitle = title || geminiData?.title || makeResponseData?.title || file.originalname.replace(/\.[^/.]+$/, '');
-    const resolvedDate = date || geminiData?.date || makeResponseData?.date || new Date().toISOString().split('T')[0];
-
-    // Determine clean doc URL (never fallback to trashed or placeholder IDs)
-    const rawUrl = makeResponseData?.documentUrl || makeResponseData?.webViewLink;
-    const cleanDocUrl = (rawUrl && !rawUrl.includes('/d//edit') && !rawUrl.includes('1v0L9I6q') && rawUrl.startsWith('https://'))
-      ? rawUrl
-      : (makeResponseData?.id || makeResponseData?.documentId)
-      ? `https://docs.google.com/document/d/${makeResponseData.id || makeResponseData.documentId}/edit`
-      : null;
+    const resolvedTitle = geminiData?.title || title || file.originalname.replace(/\.[^/.]+$/, '');
+    const resolvedDate = geminiData?.date || date || new Date().toISOString().split('T')[0];
 
     return res.json({
       success: true,
-      data: geminiData || makeResponseData,
+      data: geminiData,
       title: resolvedTitle,
       department: department,
       date: resolvedDate,
-      summary: geminiData?.summary || 'Executive Minutes of Meeting synthesized via Google Gemini AI.',
+      summary: geminiData?.summary || 'Executive Minutes of Meeting synthesized directly via Google Gemini AI.',
       discussion_points: geminiData?.discussion_points || [],
       decisions: geminiData?.decisions || [],
       action_items: geminiData?.action_items || [],
-      documentUrl: cleanDocUrl,
+      documentUrl: null,
       folderUrl: TARGET_DRIVE_FOLDER,
-      message: 'MOM synthesized and synced to Tamilpreneur Team Hub.'
+      message: 'MOM synthesized directly with Google Gemini AI (Zero Make.com credits).'
     });
 
   } catch (err) {
@@ -296,7 +262,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Tamilpreneur MOM Studio Backend running on http://localhost:${PORT}`);
-  console.log(`⚡ Direct Gemini AI Engine: Active (gemini-3-flash-preview)`);
+  console.log(`⚡ Direct Gemini AI Engine: Active (gemini-3.8-flash)`);
   console.log(`📦 Max Ingest Capacity: 2.0 GB (Disk Streaming + 98% Downsampler)`);
-  console.log(`🔗 Webhook Target: ${MAKE_WEBHOOK_URL}`);
+  console.log(`🛡️ 100% Direct AI Execution: Zero Make.com credits required`);
 });

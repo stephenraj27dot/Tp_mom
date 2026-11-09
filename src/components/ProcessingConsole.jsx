@@ -13,10 +13,10 @@ export default function ProcessingConsole({ currentStage, error, fileName }) {
 
   const logs = [
     { stage: 1, text: `INGEST: Staging audio payload [${fileName || 'audio.mp3'}]` },
-    { stage: 2, text: 'PIPELINE: Transmitted buffer to Make.com Webhook (0-latency)' },
+    { stage: 2, text: 'PIPELINE: Streaming audio buffer directly to Google Gemini Engine' },
     { stage: 3, text: 'GEMINI STT: Transcribing speech turns & preserving speaker context' },
     { stage: 4, text: 'INTELLIGENCE: Structuring discussion points, decisions & deadlines' },
-    { stage: 5, text: 'STORAGE: Compiling executive document into Google Drive /meeting-audio' },
+    { stage: 5, text: 'SYNTHESIS: Compiling executive Minutes of Meeting artifact' },
   ];
 
   return (
@@ -35,7 +35,7 @@ export default function ProcessingConsole({ currentStage, error, fileName }) {
               Executive Processing In Progress
             </h3>
             <p className="text-[11px] font-mono text-slate-400">
-              MAKE SCENARIO: MOM - Gemini STT Studio Webhook
+              DIRECT AI ENGINE: Autonomous Gemini MOM Synthesizer
             </p>
           </div>
         </div>
