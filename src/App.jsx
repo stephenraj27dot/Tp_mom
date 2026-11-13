@@ -6,6 +6,7 @@ import ProcessingConsole from './components/ProcessingConsole';
 import ExecutiveDocCard from './components/ExecutiveDocCard';
 import CallAnalyzerCard from './components/CallAnalyzerCard';
 import MeetingArchive from './components/MeetingArchive';
+import ExecutiveKpiBar from './components/ExecutiveKpiBar';
 import Footer from './components/Footer';
 import { ArrowRight, Disc3, Zap, Users, ExternalLink, Table } from 'lucide-react';
 
@@ -19,6 +20,7 @@ const GEMINI_API_KEY = ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('mom'); // 'mom' | 'call_analyzer'
+  const [language, setLanguage] = useState('english'); // 'english' | 'tamil' | 'bilingual'
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [department, setDepartment] = useState('General');
@@ -27,6 +29,23 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [resultData, setResultData] = useState(null);
   const [archive, setArchive] = useState([]);
+  const [momArchiveList, setMomArchiveList] = useState([]);
+  const [callArchiveList, setCallArchiveList] = useState([]);
+
+  const refreshAllArchives = () => {
+    try {
+      const m = localStorage.getItem(MOM_STORAGE_KEY);
+      setMomArchiveList(m ? JSON.parse(m) : []);
+      const c = localStorage.getItem(CALL_STORAGE_KEY);
+      setCallArchiveList(c ? JSON.parse(c) : []);
+    } catch (e) {
+      console.warn('Could not read all archives:', e);
+    }
+  };
+
+  useEffect(() => {
+    refreshAllArchives();
+  }, []);
 
   // Load appropriate archive & last active artifact when activeTab changes
   useEffect(() => {
@@ -76,6 +95,31 @@ export default function App() {
       }
       return updated;
     });
+    refreshAllArchives();
+  };
+
+  const handleUpdateRecord = (updatedResult) => {
+    setResultData(updatedResult);
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    try {
+      localStorage.setItem(activeKey, JSON.stringify(updatedResult));
+    } catch (e) {
+      console.warn('Could not persist active record:', e);
+    }
+    saveToArchive({
+      id: updatedResult.id,
+      title: updatedResult.title,
+      department: updatedResult.department || department,
+      docUrl: updatedResult.docUrl || updatedResult.documentUrl || null,
+      date: updatedResult.date,
+      createdAt: updatedResult.createdAt || new Date().toISOString(),
+      summary: updatedResult.summary,
+      decisions: updatedResult.decisions,
+      action_items: updatedResult.action_items,
+      discussion_points: updatedResult.discussion_points,
+      fullData: updatedResult,
+      data: updatedResult.data || updatedResult
+    });
   };
 
   const handleClearArchive = () => {
@@ -87,6 +131,7 @@ export default function App() {
       setStatus('idle');
       localStorage.removeItem(storageKey);
       localStorage.removeItem(activeKey);
+      refreshAllArchives();
     }
   };
 
@@ -102,6 +147,7 @@ export default function App() {
       }
       return updated;
     });
+    refreshAllArchives();
 
     if (resultData && (resultData.id === id || resultData.title === id)) {
       setResultData(null);
@@ -239,13 +285,30 @@ export default function App() {
           Return ONLY valid JSON.`;
         }
 
-        // Live-tested model fallback chain with optimized thinkingLevel
+        // Language Directive injection
+        let languageDirective = '';
+        if (language === 'tamil') {
+          languageDirective = `\nCRITICAL LANGUAGE INSTRUCTION:
+- Generate all summaries, discussion points, decisions, and action notes strictly in clear, professional Tamil (தமிழ் வடிவம்).
+- Maintain corporate standard vocabulary with English technical terms in parentheses where appropriate.`;
+        } else if (language === 'bilingual') {
+          languageDirective = `\nCRITICAL LANGUAGE INSTRUCTION:
+- Generate bilingual output (Tamil + English).
+- Executive summary, key points, and strategic observations should provide clear English and Tamil context.`;
+        } else {
+          languageDirective = `\nCRITICAL LANGUAGE INSTRUCTION:
+- Generate in high-standard professional corporate English.`;
+        }
+
+        prompt += `\n${languageDirective}`;
+
+        // Verified active high-speed Gemini model fallback chain
         const models = [
-          { name: 'gemini-3-flash-preview', cfg: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } } },
           { name: 'gemini-flash-lite-latest', cfg: { responseMimeType: 'application/json' } },
+          { name: 'gemini-3.1-flash-lite', cfg: { responseMimeType: 'application/json' } },
           { name: 'gemini-3.5-flash-lite', cfg: { responseMimeType: 'application/json' } },
-          { name: 'gemini-3.6-flash', cfg: { responseMimeType: 'application/json' } },
-          { name: 'gemini-3.5-flash', cfg: { responseMimeType: 'application/json' } }
+          { name: 'gemini-3.1-flash-lite-preview', cfg: { responseMimeType: 'application/json' } },
+          { name: 'gemini-3-flash-preview', cfg: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } } }
         ];
 
         for (const mdl of models) {
@@ -434,12 +497,15 @@ export default function App() {
 
       {/* Main Studio Workdesk */}
       <main className="relative z-10 flex-1 flex flex-col justify-start max-w-3xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Executive KPI Stats Bar */}
+        <ExecutiveKpiBar momArchive={momArchiveList} callArchive={callArchiveList} />
+
         <Hero activeTab={activeTab} />
 
         {/* State 1: IDLE / ERROR (The Audio Console Deck) */}
         {(status === 'idle' || status === 'error') && (
           <div className="space-y-6 animate-fade-in">
-            {/* Interactive Audio Console with Inline Title & Pills */}
+            {/* Interactive Audio Console with Inline Title, Mode Switcher & Language Selector */}
             <AudioConsole
               file={file}
               onFileSelect={(selected) => setFile(selected)}
@@ -449,6 +515,8 @@ export default function App() {
               department={department}
               onDepartmentChange={setDepartment}
               activeTab={activeTab}
+              language={language}
+              onLanguageChange={setLanguage}
             />
 
             {/* Error Message */}
@@ -520,12 +588,14 @@ export default function App() {
                 result={resultData}
                 onReset={handleReset}
                 onDeleteCurrent={handleDeleteCurrent}
+                onUpdateRecord={handleUpdateRecord}
               />
             ) : (
               <ExecutiveDocCard
                 result={resultData}
                 onReset={handleReset}
                 onDeleteCurrent={handleDeleteCurrent}
+                onUpdateRecord={handleUpdateRecord}
               />
             )}
 
