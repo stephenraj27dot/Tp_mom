@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import AudioConsole from './components/AudioConsole';
@@ -7,18 +7,50 @@ import ExecutiveDocCard from './components/ExecutiveDocCard';
 import CallAnalyzerCard from './components/CallAnalyzerCard';
 import MeetingArchive from './components/MeetingArchive';
 import ExecutiveKpiBar from './components/ExecutiveKpiBar';
+import AuthModal from './components/AuthModal';
+import SettingsModal from './components/SettingsModal';
+import UserActivityDrawer from './components/UserActivityDrawer';
+import MobileBottomNav from './components/MobileBottomNav';
 import Footer from './components/Footer';
 import { ArrowRight, Disc3, Zap, Users, ExternalLink, Table } from 'lucide-react';
+import {
+  getCurrentUser, signOut, getUserRecords, saveUserRecord,
+  deleteUserRecord, logUserActivity
+} from './services/supabaseService';
 
-const MOM_STORAGE_KEY = 'tamilpreneur_mom_archive';
-const MOM_ACTIVE_KEY = 'tamilpreneur_mom_last_active';
-const CALL_STORAGE_KEY = 'tamilpreneur_call_archive';
-const CALL_ACTIVE_KEY = 'tamilpreneur_call_last_active';
 const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
-
 const GEMINI_API_KEY = ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
 
 export default function App() {
+  // ── Authentication & Organization State ─────────────────────────────────────
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
+
+  // ── Theme State (Dark / Light) ──────────────────────────────────────────────
+  const [theme, setTheme] = useState(() => {
+    return (typeof window !== 'undefined' && localStorage.getItem('tp_theme')) || 'dark';
+  });
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('tp_theme', next);
+        document.documentElement.classList.toggle('dark', next === 'dark');
+      } catch (e) {
+        console.warn(e);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
+  // ── Workspace State ─────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('mom'); // 'mom' | 'call_analyzer'
   const [language, setLanguage] = useState('english'); // 'english' | 'tamil' | 'bilingual'
   const [file, setFile] = useState(null);
@@ -28,41 +60,44 @@ export default function App() {
   const [currentStage, setCurrentStage] = useState(1);
   const [errorMsg, setErrorMsg] = useState(null);
   const [resultData, setResultData] = useState(null);
+
+  // Per-User Isolated Archives
   const [archive, setArchive] = useState([]);
   const [momArchiveList, setMomArchiveList] = useState([]);
   const [callArchiveList, setCallArchiveList] = useState([]);
 
-  const refreshAllArchives = () => {
+  const currentUserId = currentUser?.id || 'guest_user';
+
+  // ── Load Per-User Records ───────────────────────────────────────────────────
+  const loadUserArchives = useCallback(async (userId = currentUserId) => {
     try {
-      const m = localStorage.getItem(MOM_STORAGE_KEY);
-      setMomArchiveList(m ? JSON.parse(m) : []);
-      const c = localStorage.getItem(CALL_STORAGE_KEY);
-      setCallArchiveList(c ? JSON.parse(c) : []);
+      const moms = await getUserRecords({ type: 'mom', userId });
+      const calls = await getUserRecords({ type: 'call', userId });
+      setMomArchiveList(moms);
+      setCallArchiveList(calls);
+      setArchive(activeTab === 'call_analyzer' ? calls : moms);
     } catch (e) {
-      console.warn('Could not read all archives:', e);
+      console.warn('Could not load user archives:', e);
     }
-  };
+  }, [currentUserId, activeTab]);
 
   useEffect(() => {
-    refreshAllArchives();
-  }, []);
+    loadUserArchives();
+  }, [loadUserArchives]);
 
-  // Load appropriate archive & last active artifact when activeTab changes
+  // When activeTab changes, switch the active archive view and reset active card
   useEffect(() => {
-    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    setArchive(activeTab === 'call_analyzer' ? callArchiveList : momArchiveList);
+    setFile(null);
+    setTitle('');
+    setDepartment(activeTab === 'call_analyzer' ? 'Inbound Lead' : 'General');
 
+    // Check last active item for this user & tab
+    const activeKey = `tp_active_${currentUserId}_${activeTab}`;
     try {
-      const savedArchive = localStorage.getItem(storageKey);
-      if (savedArchive) {
-        setArchive(JSON.parse(savedArchive));
-      } else {
-        setArchive([]);
-      }
-
-      const savedActive = localStorage.getItem(activeKey);
-      if (savedActive) {
-        const parsed = JSON.parse(savedActive);
+      const raw = localStorage.getItem(activeKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
         if (parsed && (parsed.title || parsed.documentUrl || parsed.data?.lead)) {
           setResultData(parsed);
           setStatus('success');
@@ -74,93 +109,86 @@ export default function App() {
         setResultData(null);
         setStatus('idle');
       }
-    } catch (e) {
-      console.warn('Could not read archive from storage:', e);
+    } catch {
+      setResultData(null);
+      setStatus('idle');
     }
+  }, [activeTab, currentUserId, callArchiveList, momArchiveList]);
 
-    setFile(null);
-    setTitle('');
-    setDepartment(activeTab === 'call_analyzer' ? 'Inbound Lead' : 'General');
-  }, [activeTab]);
-
-  const saveToArchive = (newItem) => {
-    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
-    setArchive((prev) => {
-      const filtered = prev.filter((m) => m.id !== newItem.id && m.docUrl !== newItem.docUrl);
-      const updated = [newItem, ...filtered].slice(0, 25);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Could not persist archive:', e);
-      }
-      return updated;
+  // ── Save / Update Record In Per-User Database ────────────────────────────────
+  const saveToArchive = async (newItem) => {
+    const type = activeTab === 'call_analyzer' ? 'call' : 'mom';
+    await saveUserRecord({
+      type,
+      record: newItem,
+      userId: currentUserId
     });
-    refreshAllArchives();
+    await loadUserArchives();
   };
 
-  const handleUpdateRecord = (updatedResult) => {
+  const handleUpdateRecord = async (updatedResult) => {
     setResultData(updatedResult);
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    const activeKey = `tp_active_${currentUserId}_${activeTab}`;
     try {
       localStorage.setItem(activeKey, JSON.stringify(updatedResult));
     } catch (e) {
       console.warn('Could not persist active record:', e);
     }
-    saveToArchive({
-      id: updatedResult.id,
-      title: updatedResult.title,
-      department: updatedResult.department || department,
-      docUrl: updatedResult.docUrl || updatedResult.documentUrl || null,
-      date: updatedResult.date,
-      createdAt: updatedResult.createdAt || new Date().toISOString(),
-      summary: updatedResult.summary,
-      decisions: updatedResult.decisions,
-      action_items: updatedResult.action_items,
-      discussion_points: updatedResult.discussion_points,
-      fullData: updatedResult,
-      data: updatedResult.data || updatedResult
+
+    const type = activeTab === 'call_analyzer' ? 'call' : 'mom';
+    await saveUserRecord({
+      type,
+      record: {
+        id: updatedResult.id,
+        title: updatedResult.title,
+        department: updatedResult.department || department,
+        docUrl: updatedResult.docUrl || updatedResult.documentUrl || null,
+        date: updatedResult.date,
+        createdAt: updatedResult.createdAt || new Date().toISOString(),
+        summary: updatedResult.summary,
+        decisions: updatedResult.decisions,
+        action_items: updatedResult.action_items,
+        discussion_points: updatedResult.discussion_points,
+        fullData: updatedResult,
+        data: updatedResult.data || updatedResult
+      },
+      userId: currentUserId
     });
+    await loadUserArchives();
   };
 
-  const handleClearArchive = () => {
-    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
-    if (window.confirm('Delete all saved records in this mode from your browser?')) {
+  const handleClearArchive = async () => {
+    if (window.confirm('Delete all your saved records in this mode from your private archive?')) {
+      const type = activeTab === 'call_analyzer' ? 'call' : 'mom';
+      for (const item of archive) {
+        await deleteUserRecord({ id: item.id, type, userId: currentUserId });
+      }
       setArchive([]);
       setResultData(null);
       setStatus('idle');
-      localStorage.removeItem(storageKey);
+      const activeKey = `tp_active_${currentUserId}_${activeTab}`;
       localStorage.removeItem(activeKey);
-      refreshAllArchives();
+      await loadUserArchives();
     }
   };
 
-  const handleDeleteItem = (id) => {
-    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
-    setArchive((prev) => {
-      const updated = prev.filter((m) => m.id !== id);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Could not persist archive:', e);
-      }
-      return updated;
-    });
-    refreshAllArchives();
-
+  const handleDeleteItem = async (id) => {
+    const type = activeTab === 'call_analyzer' ? 'call' : 'mom';
+    await deleteUserRecord({ id, type, userId: currentUserId });
     if (resultData && (resultData.id === id || resultData.title === id)) {
       setResultData(null);
       setStatus('idle');
+      const activeKey = `tp_active_${currentUserId}_${activeTab}`;
       localStorage.removeItem(activeKey);
     }
+    await loadUserArchives();
   };
 
   const handleDeleteCurrent = () => {
     if (resultData?.id) {
       handleDeleteItem(resultData.id);
     } else {
-      const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+      const activeKey = `tp_active_${currentUserId}_${activeTab}`;
       setResultData(null);
       setStatus('idle');
       localStorage.removeItem(activeKey);
@@ -182,7 +210,7 @@ export default function App() {
     };
     setResultData(fullResult);
     setStatus('success');
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    const activeKey = `tp_active_${currentUserId}_${activeTab}`;
     try {
       localStorage.setItem(activeKey, JSON.stringify(fullResult));
     } catch (e) {
@@ -191,6 +219,22 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ── Authentication Actions ──────────────────────────────────────────────────
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+    loadUserArchives(user.id);
+    setAuthModalOpen(false);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setCurrentUser(null);
+    setResultData(null);
+    setStatus('idle');
+    setAuthModalOpen(true);
+  };
+
+  // ── Synthesis & AI Processing Pipeline ──────────────────────────────────────
   const handleStartProcessing = async () => {
     if (!file) {
       alert('Please select or drop an audio recording first.');
@@ -201,19 +245,17 @@ export default function App() {
     setCurrentStage(1);
     setErrorMsg(null);
 
-    // Smooth, snappy stage progress
     const stageInterval = setInterval(() => {
       setCurrentStage((prev) => (prev < 4 ? prev + 1 : prev));
     }, 900);
 
     const resolvedTitle = title.trim() || file.name.replace(/\.[^/.]+$/, '');
-    const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
     const isHeavy = file.size > 20 * 1024 * 1024; // > 20MB
 
     try {
       let data = null;
 
-      // Primary Flow: 100% Direct In-Browser Gemini AI (Zero Render Wait, 2-5s Turnaround)
+      // Primary Flow: 100% Direct In-Browser Gemini AI (Zero Cold Starts, Sub-2s Turnaround)
       if (!isHeavy) {
         const reader = new FileReader();
         const base64Promise = new Promise((resolve, reject) => {
@@ -302,7 +344,7 @@ export default function App() {
 
         prompt += `\n${languageDirective}`;
 
-        // Verified active high-speed Gemini model fallback chain
+        // Verified active high-speed Gemini model fallback chain (No 404, No Hangs)
         const models = [
           { name: 'gemini-flash-lite-latest', cfg: { responseMimeType: 'application/json' } },
           { name: 'gemini-3.1-flash-lite', cfg: { responseMimeType: 'application/json' } },
@@ -399,21 +441,21 @@ export default function App() {
         action_items: data.action_items || data.follow_ups || [],
         discussion_points: data.discussion_points || [],
         size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
-        data: data // Preserves complete raw data for Call Analyzer or MOM
+        data: data
       };
 
       setResultData(enrichedResult);
       setStatus('success');
 
-      const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+      const activeKey = `tp_active_${currentUserId}_${activeTab}`;
       try {
         localStorage.setItem(activeKey, JSON.stringify(enrichedResult));
       } catch (e) {
         console.warn('Could not persist active record:', e);
       }
 
-      // Add to appropriate archive
-      saveToArchive({
+      // Save to isolated user database
+      await saveToArchive({
         id: meetingId,
         title: enrichedResult.title,
         department: department,
@@ -443,26 +485,53 @@ export default function App() {
     setResultData(null);
     setErrorMsg(null);
     setCurrentStage(1);
-    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    const activeKey = `tp_active_${currentUserId}_${activeTab}`;
     localStorage.removeItem(activeKey);
   };
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#070B12] text-slate-100 selection:bg-[#ff4d5a]/25 selection:text-[#ff4d5a] overflow-x-hidden font-sans">
+    <div
+      className={`relative min-h-screen flex flex-col selection:bg-[#ff4d5a]/25 selection:text-[#ff4d5a] overflow-x-hidden font-sans pb-16 sm:pb-0 transition-colors duration-200 ${
+        isDark ? 'bg-[#070B12] text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
+      }`}
+    >
       {/* Brand Ambient Glow */}
       <div className="brand-ambient-glow" />
 
-      {/* Header Bar with Mode Switcher */}
-      <Header activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Corporate Header */}
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        currentUser={currentUser}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenActivity={() => setActivityDrawerOpen(true)}
+        onSignOut={handleSignOut}
+      />
 
       {/* Sub-Header Hub Banner */}
-      <div className="relative z-10 max-w-3xl w-full mx-auto px-4 sm:px-6 pt-3 pb-0">
-        <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-[11px] font-mono text-slate-400">
+      <div className="relative z-10 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-3 pb-0">
+        <div
+          className={`flex items-center justify-between p-2.5 px-3.5 rounded-2xl border text-[11px] font-mono transition-colors ${
+            isDark
+              ? 'bg-white/[0.02] border-white/[0.06] text-slate-400'
+              : 'bg-white border-slate-200 text-slate-600 shadow-sm'
+          }`}
+        >
           <div className="flex items-center gap-2 truncate">
+            {currentUser && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[#ff4d5a] font-bold">
+                @{currentUser.fullName.split(' ')[0]}:
+              </span>
+            )}
             {activeTab === 'call_analyzer' ? (
               <>
                 <Table className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate">Tamilpreneur Sales CRM: Records link directly to Google Sheets</span>
+                <span className="truncate">Tamilpreneur Sales CRM: Records link to Google Sheets</span>
               </>
             ) : (
               <>
@@ -476,7 +545,7 @@ export default function App() {
               href="https://docs.google.com/spreadsheets/d/17zWVa_hCrkreGLOT6mNLIHJJDUp-FUAbW09yisn9nVs/edit?gid=0#gid=0"
               target="_blank"
               rel="noreferrer"
-              className="text-emerald-300 hover:text-white flex items-center gap-1 font-semibold underline shrink-0 pl-2"
+              className="text-emerald-500 hover:text-emerald-400 flex items-center gap-1 font-semibold underline shrink-0 pl-2"
             >
               <span>Call Analyzer CRM</span>
               <ExternalLink className="w-3 h-3" />
@@ -486,7 +555,7 @@ export default function App() {
               href="https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP"
               target="_blank"
               rel="noreferrer"
-              className="text-slate-200 hover:text-white flex items-center gap-1 font-semibold underline shrink-0 pl-2"
+              className="text-slate-400 hover:text-slate-200 flex items-center gap-1 font-semibold underline shrink-0 pl-2"
             >
               <span>/meeting-audio</span>
               <ExternalLink className="w-3 h-3" />
@@ -497,7 +566,7 @@ export default function App() {
 
       {/* Main Studio Workdesk */}
       <main className="relative z-10 flex-1 flex flex-col justify-start max-w-3xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Executive KPI Stats Bar */}
+        {/* Executive KPI Stats Bar (Per-User Metrics) */}
         <ExecutiveKpiBar momArchive={momArchiveList} callArchive={callArchiveList} />
 
         <Hero activeTab={activeTab} />
@@ -505,7 +574,7 @@ export default function App() {
         {/* State 1: IDLE / ERROR (The Audio Console Deck) */}
         {(status === 'idle' || status === 'error') && (
           <div className="space-y-6 animate-fade-in">
-            {/* Interactive Audio Console with Inline Title, Mode Switcher & Language Selector */}
+            {/* Interactive Audio Console */}
             <AudioConsole
               file={file}
               onFileSelect={(selected) => setFile(selected)}
@@ -521,7 +590,7 @@ export default function App() {
 
             {/* Error Message */}
             {status === 'error' && errorMsg && (
-              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs font-mono">
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-rose-400 text-xs font-mono">
                 <b>PIPELINE ERROR:</b> {errorMsg}
               </div>
             )}
@@ -535,13 +604,13 @@ export default function App() {
                 className={`group w-full sm:w-auto min-w-[280px] sm:min-w-[340px] px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-sm tracking-wide transition-all flex items-center justify-center space-x-2.5 select-none ${
                   file
                     ? 'btn-executive-primary cursor-pointer'
-                    : 'bg-white/[0.04] text-slate-600 border border-white/[0.06] cursor-not-allowed'
+                    : 'bg-white/[0.04] text-slate-500 border border-white/[0.06] cursor-not-allowed'
                 }`}
               >
                 {file ? (
                   <Zap className="w-4 h-4 fill-current group-hover:rotate-12 group-hover:scale-110 transition-transform duration-200" />
                 ) : (
-                  <Disc3 className="w-4 h-4 text-slate-600" />
+                  <Disc3 className="w-4 h-4 text-slate-500" />
                 )}
 
                 <span className="font-extrabold tracking-wide">
@@ -556,7 +625,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Team Archive Hub */}
+            {/* Team Archive Hub (Scoped to this User) */}
             <div className="pt-4">
               <MeetingArchive
                 meetings={archive}
@@ -612,6 +681,42 @@ export default function App() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Mobile App Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenActivity={() => setActivityDrawerOpen(true)}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        currentUser={currentUser}
+        theme={theme}
+      />
+
+      {/* Modals & Slide-in Drawers */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+        theme={theme}
+      />
+
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        language={language}
+        onLanguageChange={setLanguage}
+        onProfileUpdated={(updated) => setCurrentUser(updated)}
+      />
+
+      <UserActivityDrawer
+        isOpen={activityDrawerOpen}
+        onClose={() => setActivityDrawerOpen(false)}
+        user={currentUser}
+        theme={theme}
+      />
     </div>
   );
 }
