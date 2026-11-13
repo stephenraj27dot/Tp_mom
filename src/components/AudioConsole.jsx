@@ -45,7 +45,7 @@ export default function AudioConsole({
 
   const pills = activeTab === 'call_analyzer' ? CALL_TYPES : MOM_DEPARTMENTS;
 
-  // ── Waveform decoder ────────────────────────────────────────────────────────
+  // ── Waveform decoder for visualizer bars ─────────────────────────────────────
   const decodeWaveform = async (blobData) => {
     try {
       setIsDecoding(true);
@@ -88,7 +88,9 @@ export default function AudioConsole({
       }
       const max = Math.max(...peaks) || 1;
       setWavePeaks(peaks.map(p => Math.max(0.14, p / max)));
-      if (audioBuf.duration) setDuration(audioBuf.duration);
+      if (audioBuf.duration && !isNaN(audioBuf.duration)) {
+        setDuration(audioBuf.duration);
+      }
     } catch {
       generateSynthPeaks();
     } finally {
@@ -105,7 +107,7 @@ export default function AudioConsole({
     setIsDecoding(false);
   };
 
-  // ── Universal In-Browser Transcoder & Player Engine (100% Client-Side, 0 Latency) ──
+  // ── Native Browser Audio Player Setup ─────────────────────────────────────────
   useEffect(() => {
     if (!file) {
       setAudioUrl(null);
@@ -117,9 +119,9 @@ export default function AudioConsole({
       return;
     }
 
-    let isCancelled = false;
-    let activeUrl = URL.createObjectURL(file);
-    setAudioUrl(activeUrl);
+    // Create 100% native uncorrupted Blob URL from the original file
+    const objectUrl = URL.createObjectURL(file);
+    setAudioUrl(objectUrl);
     setIsPlaying(false);
     setCurrentTime(0);
 
@@ -133,53 +135,46 @@ export default function AudioConsole({
       onTitleChange(cleanName || (activeTab === 'call_analyzer' ? 'Client Sales Call' : 'Tamilpreneur Meeting'));
     }
 
-    const processAudio = async () => {
-      try {
-        setIsOptimizing(true);
+    // Decode waveform visualizer bars in background (does NOT touch audio playback URL)
+    decodeWaveform(file);
 
-        // Instant In-Browser Decoding (WASM libopus + Web Audio - 100% local, zero Render wait!)
-        const res = await transcodeAudioInBrowser(file);
-        if (isCancelled) return;
+    // Check if the format needs WASM decoding (e.g. WhatsApp .opus on browsers without native Opus support)
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const isOpus = ext === 'opus' || ext === 'ogg' || file.name.toLowerCase().includes('whatsapp');
+    const testAudio = document.createElement('audio');
+    const canPlayDirectly =
+      testAudio.canPlayType(file.type || 'audio/mpeg') !== '' ||
+      testAudio.canPlayType('audio/ogg; codecs=opus') !== '' ||
+      testAudio.canPlayType('audio/wav') !== '' ||
+      testAudio.canPlayType('audio/mp3') !== '';
 
-        if (res.success && res.wavBlob) {
-          URL.revokeObjectURL(activeUrl);
-          activeUrl = URL.createObjectURL(res.wavBlob);
-          setAudioUrl(activeUrl);
-          setWavePeaks(res.peaks || []);
+    if (isOpus && !canPlayDirectly) {
+      setIsOptimizing(true);
+      transcodeAudioInBrowser(file).then(res => {
+        if (res && res.wavBlob) {
+          const fallbackWavUrl = URL.createObjectURL(res.wavBlob);
+          setAudioUrl(fallbackWavUrl);
           if (res.duration) setDuration(res.duration);
-          return;
         }
-
-        const fallback = res.fixedBlob || file;
-        URL.revokeObjectURL(activeUrl);
-        activeUrl = URL.createObjectURL(fallback);
-        setAudioUrl(activeUrl);
-        if (res.isHeavy) {
-          generateSynthPeaks();
-        } else {
-          decodeWaveform(fallback);
-        }
-      } catch (err) {
-        console.warn('[AudioConsole] Local transcode fallback:', err);
-        if (isCancelled) return;
-        decodeWaveform(file);
-      } finally {
-        if (!isCancelled) setIsOptimizing(false);
-      }
-    };
-
-    processAudio();
+      }).catch(err => {
+        console.warn('[AudioConsole] Opus transcode error:', err);
+      }).finally(() => {
+        setIsOptimizing(false);
+      });
+    }
 
     return () => {
-      isCancelled = true;
-      if (activeUrl) URL.revokeObjectURL(activeUrl);
+      URL.revokeObjectURL(objectUrl);
     };
   }, [file]);
 
   // Prime audio element whenever audioUrl changes
   useEffect(() => {
     if (audioRef.current && audioUrl) {
-      audioRef.current.load();
+      const a = audioRef.current;
+      a.volume = isMuted ? 0 : (volume || 1);
+      a.muted = isMuted;
+      a.load();
     }
   }, [audioUrl]);
 
@@ -188,13 +183,17 @@ export default function AudioConsole({
     if (a && a.duration && !isNaN(a.duration) && a.duration !== Infinity) {
       setDuration(a.duration);
     }
+    if (a) {
+      a.volume = isMuted ? 0 : (volume || 1);
+      a.muted = isMuted;
+    }
   };
 
   const handleTimeUpdate = () => {
     const a = audioRef.current;
     if (a) {
       setCurrentTime(a.currentTime);
-      if (!duration && a.duration && !isNaN(a.duration)) {
+      if (!duration && a.duration && !isNaN(a.duration) && a.duration !== Infinity) {
         setDuration(a.duration);
       }
     }
@@ -206,14 +205,19 @@ export default function AudioConsole({
 
     if (!a.paused) {
       a.pause();
+      setIsPlaying(false);
     } else {
       try {
-        a.volume = isMuted ? 0 : volume;
+        a.volume = isMuted ? 0 : (volume || 1);
         a.muted = isMuted;
-        const p = a.play();
-        if (p !== undefined) await p;
+        const playPromise = a.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
+        setIsPlaying(true);
       } catch (err) {
-        console.error('[AudioConsole] play() blocked:', err);
+        console.warn('[AudioConsole] Playback blocked or failed:', err);
+        setIsPlaying(false);
       }
     }
   };
@@ -224,7 +228,7 @@ export default function AudioConsole({
     setIsMuted(next);
     if (a) {
       a.muted = next;
-      if (!next) a.volume = volume;
+      if (!next) a.volume = volume || 1;
     }
   };
 
@@ -326,7 +330,7 @@ export default function AudioConsole({
 
             <button
               type="button"
-              className="px-6 py-2.5 rounded-xl bg-white/[0.06] group-hover:bg-[#ff4d5a] border border-white/[0.12] group-hover:border-[#ff4d5a] text-slate-100 group-hover:text-white font-medium text-xs sm:text-sm transition-all duration-200 active:scale-95 shadow-sm group-hover:shadow-md group-hover:shadow-[#ff4d5a]/25"
+              className="px-6 py-2.5 rounded-xl bg-white/[0.06] group-hover:bg-[#ff4d5a] border border-white/[0.12] group-hover:border-[#ff4d5a] text-slate-100 group-hover:text-white font-medium text-xs sm:text-sm transition-all duration-200 active:scale-95 shadow-sm group-hover:shadow-md group-hover:shadow-[#ff4d5a]/25 cursor-pointer"
             >
               Select Audio Recording
             </button>
@@ -365,7 +369,7 @@ export default function AudioConsole({
               <button
                 type="button"
                 onClick={rewind}
-                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors cursor-pointer"
                 title="Rewind to start"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -373,7 +377,7 @@ export default function AudioConsole({
               <button
                 type="button"
                 onClick={eject}
-                className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
                 title="Remove recording"
               >
                 <X className="w-4 h-4" />
@@ -498,7 +502,7 @@ export default function AudioConsole({
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] transition-colors cursor-pointer"
                 >
                   {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
                 </button>
@@ -523,19 +527,21 @@ export default function AudioConsole({
             </button>
           </div>
 
-          {/* Browser Audio Player Element */}
+          {/* Native HTML5 Audio Player Element */}
           {audioUrl && (
             <div className="pt-1">
               <audio
                 ref={audioRef}
                 src={audioUrl}
                 controls
+                preload="auto"
                 className="w-full h-8 rounded-lg opacity-80 hover:opacity-100 transition-opacity"
                 onLoadedMetadata={handleLoadedMetadata}
                 onTimeUpdate={handleTimeUpdate}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
+                onError={(e) => console.warn('[AudioConsole] Native audio element warning:', e)}
               />
             </div>
           )}
