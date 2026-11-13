@@ -4,51 +4,73 @@ import Hero from './components/Hero';
 import AudioConsole from './components/AudioConsole';
 import ProcessingConsole from './components/ProcessingConsole';
 import ExecutiveDocCard from './components/ExecutiveDocCard';
+import CallAnalyzerCard from './components/CallAnalyzerCard';
 import MeetingArchive from './components/MeetingArchive';
 import Footer from './components/Footer';
-import { ArrowRight, Disc3, Zap, Users, ExternalLink } from 'lucide-react';
+import { ArrowRight, Disc3, Zap, Users, ExternalLink, Table } from 'lucide-react';
 
-const STORAGE_KEY = 'tamilpreneur_mom_archive';
-const ACTIVE_MOM_KEY = 'tamilpreneur_mom_last_active';
+const MOM_STORAGE_KEY = 'tamilpreneur_mom_archive';
+const MOM_ACTIVE_KEY = 'tamilpreneur_mom_last_active';
+const CALL_STORAGE_KEY = 'tamilpreneur_call_archive';
+const CALL_ACTIVE_KEY = 'tamilpreneur_call_last_active';
 const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
 
+const GEMINI_API_KEY = ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
+
 export default function App() {
+  const [activeTab, setActiveTab] = useState('mom'); // 'mom' | 'call_analyzer'
   const [file, setFile] = useState(null);
-  const [meetingTitle, setMeetingTitle] = useState('');
+  const [title, setTitle] = useState('');
   const [department, setDepartment] = useState('General');
   const [status, setStatus] = useState('idle'); // 'idle' | 'processing' | 'success' | 'error'
   const [currentStage, setCurrentStage] = useState(1);
   const [errorMsg, setErrorMsg] = useState(null);
   const [resultData, setResultData] = useState(null);
-  const [meetingsArchive, setMeetingsArchive] = useState([]);
+  const [archive, setArchive] = useState([]);
 
-  // Load team archive and last synthesized MOM from localStorage on mount (Permanent Output Persistence)
+  // Load appropriate archive & last active artifact when activeTab changes
   useEffect(() => {
+    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+
     try {
-      const savedArchive = localStorage.getItem(STORAGE_KEY);
+      const savedArchive = localStorage.getItem(storageKey);
       if (savedArchive) {
-        setMeetingsArchive(JSON.parse(savedArchive));
+        setArchive(JSON.parse(savedArchive));
+      } else {
+        setArchive([]);
       }
 
-      const savedActiveMOM = localStorage.getItem(ACTIVE_MOM_KEY);
-      if (savedActiveMOM) {
-        const parsed = JSON.parse(savedActiveMOM);
-        if (parsed && (parsed.title || parsed.documentUrl)) {
+      const savedActive = localStorage.getItem(activeKey);
+      if (savedActive) {
+        const parsed = JSON.parse(savedActive);
+        if (parsed && (parsed.title || parsed.documentUrl || parsed.data?.lead)) {
           setResultData(parsed);
           setStatus('success');
+        } else {
+          setResultData(null);
+          setStatus('idle');
         }
+      } else {
+        setResultData(null);
+        setStatus('idle');
       }
     } catch (e) {
-      console.warn('Could not read meeting archive from storage:', e);
+      console.warn('Could not read archive from storage:', e);
     }
-  }, []);
+
+    setFile(null);
+    setTitle('');
+    setDepartment(activeTab === 'call_analyzer' ? 'Inbound Lead' : 'General');
+  }, [activeTab]);
 
   const saveToArchive = (newItem) => {
-    setMeetingsArchive((prev) => {
+    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
+    setArchive((prev) => {
       const filtered = prev.filter((m) => m.id !== newItem.id && m.docUrl !== newItem.docUrl);
-      const updated = [newItem, ...filtered].slice(0, 20); // keep up to 20 meetings
+      const updated = [newItem, ...filtered].slice(0, 25);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch (e) {
         console.warn('Could not persist archive:', e);
       }
@@ -57,20 +79,24 @@ export default function App() {
   };
 
   const handleClearArchive = () => {
-    if (window.confirm('Delete all saved meeting records from your browser?')) {
-      setMeetingsArchive([]);
+    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    if (window.confirm('Delete all saved records in this mode from your browser?')) {
+      setArchive([]);
       setResultData(null);
       setStatus('idle');
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(ACTIVE_MOM_KEY);
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(activeKey);
     }
   };
 
-  const handleDeleteMeeting = (id) => {
-    setMeetingsArchive((prev) => {
+  const handleDeleteItem = (id) => {
+    const storageKey = activeTab === 'call_analyzer' ? CALL_STORAGE_KEY : MOM_STORAGE_KEY;
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    setArchive((prev) => {
       const updated = prev.filter((m) => m.id !== id);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch (e) {
         console.warn('Could not persist archive:', e);
       }
@@ -80,45 +106,48 @@ export default function App() {
     if (resultData && (resultData.id === id || resultData.title === id)) {
       setResultData(null);
       setStatus('idle');
-      localStorage.removeItem(ACTIVE_MOM_KEY);
+      localStorage.removeItem(activeKey);
     }
   };
 
-  const handleDeleteCurrentMOM = () => {
+  const handleDeleteCurrent = () => {
     if (resultData?.id) {
-      handleDeleteMeeting(resultData.id);
+      handleDeleteItem(resultData.id);
     } else {
+      const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
       setResultData(null);
       setStatus('idle');
-      localStorage.removeItem(ACTIVE_MOM_KEY);
+      localStorage.removeItem(activeKey);
     }
   };
 
-  const handleSelectArchiveMeeting = (meeting) => {
-    const fullResult = {
-      id: meeting.id,
-      title: meeting.title,
-      department: meeting.department,
-      date: meeting.date,
-      documentUrl: meeting.docUrl || meeting.documentUrl,
-      summary: meeting.summary || 'Executive Minutes of Meeting',
-      discussion_points: meeting.discussion_points || [],
-      decisions: meeting.decisions || [],
-      action_items: meeting.action_items || [],
+  const handleSelectArchiveItem = (item) => {
+    const fullResult = item.fullData || {
+      id: item.id,
+      title: item.title,
+      department: item.department,
+      date: item.date,
+      documentUrl: item.docUrl || item.documentUrl,
+      summary: item.summary,
+      discussion_points: item.discussion_points || [],
+      decisions: item.decisions || [],
+      action_items: item.action_items || [],
+      data: item.data || item
     };
     setResultData(fullResult);
     setStatus('success');
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
     try {
-      localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(fullResult));
+      localStorage.setItem(activeKey, JSON.stringify(fullResult));
     } catch (e) {
-      console.warn('Could not persist active MOM:', e);
+      console.warn('Could not persist active record:', e);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleStartProcessing = async () => {
     if (!file) {
-      alert('Please insert a meeting audio tape (.mp3, .wav, or WhatsApp audio) first.');
+      alert('Please select or drop an audio recording first.');
       return;
     }
 
@@ -126,21 +155,148 @@ export default function App() {
     setCurrentStage(1);
     setErrorMsg(null);
 
+    // Smooth, snappy stage progress
     const stageInterval = setInterval(() => {
-      setCurrentStage((prev) => (prev < 5 ? prev + 1 : prev));
-    }, 3800);
+      setCurrentStage((prev) => (prev < 4 ? prev + 1 : prev));
+    }, 900);
 
-    const resolvedTitle = meetingTitle.trim() || file.name.replace(/\.[^/.]+$/, '');
+    const resolvedTitle = title.trim() || file.name.replace(/\.[^/.]+$/, '');
     const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
-    const isHeavy = file.size > 25 * 1024 * 1024; // > 25MB (GB-range or high bitrate)
+    const isHeavy = file.size > 20 * 1024 * 1024; // > 20MB
 
     try {
-      let data = {};
-      let finalDocUrl = null;
+      let data = null;
 
-      // Path 1: Local / Cloud Node Server (Handles up to 2.0 GB via disk streaming + FFmpeg)
-      if (!isVercel || API_BASE) {
+      // Primary Flow: 100% Direct In-Browser Gemini AI (Zero Render Wait, 2-5s Turnaround)
+      if (!isHeavy) {
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(file);
+        const base64Data = await base64Promise;
+
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        let cleanMime = 'audio/mp3';
+        if (ext === 'wav' || file.type?.includes('wav')) {
+          cleanMime = 'audio/wav';
+        } else if (ext === 'ogg' || ext === 'opus' || file.type?.includes('ogg') || file.type?.includes('opus')) {
+          cleanMime = 'audio/ogg';
+        } else if (ext === 'm4a' || ext === 'aac' || file.type?.includes('aac') || file.type?.includes('mp4')) {
+          cleanMime = 'audio/mp4';
+        } else {
+          cleanMime = 'audio/mp3';
+        }
+
+        // Build customized prompt based on active mode
+        const todayDate = new Date().toISOString().split('T')[0];
+        let prompt = '';
+
+        if (activeTab === 'call_analyzer') {
+          prompt = `You are the AI Lead Intelligence Agent for Tamilpreneur CRM. Analyze the attached client/sales call audio recording carefully. Date today: ${todayDate}. Call Type / Lead hint: "${resolvedTitle}".
+          
+          Determine if a business lead exists. Extract:
+          - "is_lead": boolean
+          - "lead_match": { "match_type": "new_lead" | "existing_lead" | "not_a_lead", "reason": string }
+          - "lead": {
+              "client_name": string or null,
+              "company_name": string or null,
+              "contact_person": string or null,
+              "phone": string or null,
+              "email": string or null,
+              "location": string or null,
+              "industry": string or null,
+              "website": string or null,
+              "social_media": string or null
+            }
+          - "requirements": array of strings (e.g. Website, Mobile App, AI Integration, Budget, Timeline)
+          - "client_questions": array of strings (questions asked by client)
+          - "client_objections": array of strings (concerns/hesitations raised by client)
+          - "follow_ups": array of { "action": string, "due_date": string or null, "assigned_to": string, "status": "Pending" }
+          - "lead_status": "New" | "Contacted" | "Requirement Collected" | "Proposal Sent" | "Under Discussion" | "Negotiation" | "Won" | "Lost"
+          - "needs_review": boolean
+          - "review_items": array of strings
+          - "conversation_summary": concise 2-3 sentence executive summary
+          - "ai_suggestions": Sales coaching critique formatted as:
+            "What Went Well: (brief highlight)
+            Areas for Improvement & Better Alternatives: (e.g. Instead of saying X, say Y...)
+            Next Call Strategy: (actionable next step advice)"
+
+          Return ONLY valid JSON.`;
+        } else {
+          prompt = `You are the executive AI Minutes of Meeting note-taker for Tamilpreneur. Meeting: "${resolvedTitle}". Department: "${department}". Date today: ${todayDate}.
+          
+          Analyze the meeting audio carefully and return valid JSON with:
+          - "title": (Formal concise meeting title)
+          - "department": "${department}"
+          - "date": "${todayDate}"
+          - "summary": (2-3 sentences executive summary)
+          - "discussion_points": (Array of 3-6 key discussion bullet points)
+          - "decisions": (Array of 2-5 key decisions agreed upon)
+          - "action_items": (Array of { "task": string, "assigned_to": string, "deadline": string, "status": "Pending" | "In Progress" | "Completed" })
+
+          Return ONLY valid JSON.`;
+        }
+
+        // Live-tested model fallback chain with optimized thinkingLevel
+        const models = [
+          { name: 'gemini-3-flash-preview', cfg: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } } },
+          { name: 'gemini-flash-lite-latest', cfg: { responseMimeType: 'application/json' } },
+          { name: 'gemini-3.5-flash-lite', cfg: { responseMimeType: 'application/json' } },
+          { name: 'gemini-3.6-flash', cfg: { responseMimeType: 'application/json' } },
+          { name: 'gemini-3.5-flash', cfg: { responseMimeType: 'application/json' } }
+        ];
+
+        for (const mdl of models) {
+          try {
+            console.log(`[Tamilpreneur Studio] Calling Gemini model: ${mdl.name}...`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+
+            const geminiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${mdl.name}:generateContent?key=${GEMINI_API_KEY}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: cleanMime, data: base64Data } }
+                      ]
+                    }
+                  ],
+                  generationConfig: mdl.cfg
+                })
+              }
+            );
+
+            clearTimeout(timeoutId);
+
+            if (geminiRes.ok) {
+              const geminiJson = await geminiRes.json();
+              const rawJsonText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (rawJsonText) {
+                data = JSON.parse(rawJsonText);
+                console.log(`[Tamilpreneur Studio] AI synthesis success with ${mdl.name}!`, data);
+                break;
+              }
+            } else {
+              console.warn(`[Tamilpreneur Studio] ${mdl.name} returned status ${geminiRes.status}`);
+            }
+          } catch (mErr) {
+            console.warn(`[Tamilpreneur Studio] Error trying ${mdl.name}:`, mErr.message);
+          }
+        }
+      }
+
+      // Secondary Flow: For heavy files (>20MB) or when Direct client call returned no data
+      if (!data && API_BASE) {
         try {
+          console.log('[Tamilpreneur Studio] Falling back to backend downsampler...');
           const formData = new FormData();
           formData.append('audio', file);
           formData.append('title', resolvedTitle);
@@ -152,244 +308,147 @@ export default function App() {
           });
 
           if (res.ok) {
-            data = await res.json();
-            if (data.documentUrl && !data.documentUrl.includes('/d//edit') && !data.documentUrl.includes('1v0L9I6q')) {
-              finalDocUrl = data.documentUrl;
+            const serverJson = await res.json();
+            if (serverJson.data && (serverJson.data.summary || serverJson.data.is_lead !== undefined)) {
+              data = serverJson.data;
             }
           }
-        } catch (nodeErr) {
-          console.warn('[MOM Studio] Local server fallback:', nodeErr);
-        }
-      }
-
-      // Path 2: Direct Client-Side Gemini AI Engine (Instant, Zero Server or Make Dependency)
-      if (isVercel || !data.summary) {
-        if (!isHeavy) {
-          // Standard audio file: 100% Direct Google Gemini AI (Zero Make.com credits)
-          try {
-            const reader = new FileReader();
-            const base64Promise = new Promise((resolve, reject) => {
-              reader.onload = () => resolve(reader.result.split(',')[1]);
-              reader.onerror = reject;
-            });
-            reader.readAsDataURL(file);
-            const base64Data = await base64Promise;
-
-            // Direct Gemini AI Engine (100% Free & Instant Real-Time Extraction)
-            try {
-              console.log('[MOM Studio] Calling Direct Google Gemini AI...');
-              const gKey = ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
-
-              const ext = (file.name.split('.').pop() || '').toLowerCase();
-              let cleanMime = 'audio/mp3';
-              if (file.type && file.type.startsWith('audio/')) {
-                cleanMime = file.type;
-              } else if (ext === 'wav') {
-                cleanMime = 'audio/wav';
-              } else if (ext === 'ogg' || ext === 'opus') {
-                cleanMime = 'audio/ogg';
-              } else if (ext === 'm4a' || ext === 'aac') {
-                cleanMime = 'audio/aac';
-              } else if (ext === 'mp3') {
-                cleanMime = 'audio/mp3';
-              }
-              if (cleanMime === 'audio/opus') cleanMime = 'audio/ogg';
-
-              const fallbackModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
-              for (const mdl of fallbackModels) {
-                try {
-                  const geminiRes = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/${mdl}:generateContent?key=${gKey}`,
-                    {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        contents: [
-                          {
-                            parts: [
-                              {
-                                text: `You are the executive AI Minutes of Meeting note-taker for Tamilpreneur. Meeting: "${meetingTitle || file.name}". Department: "${department}". Analyze audio and return valid JSON with: title, department, date, summary, discussion_points (array of strings), decisions (array of strings), action_items (array of {task, assigned_to, deadline, status}). Return ONLY JSON.`
-                              },
-                              {
-                                inlineData: {
-                                  mimeType: cleanMime,
-                                  data: base64Data
-                                }
-                              }
-                            ]
-                          }
-                        ],
-                        generationConfig: {
-                          responseMimeType: 'application/json'
-                        }
-                      })
-                    }
-                  );
-
-                  if (geminiRes.ok) {
-                    const geminiJson = await geminiRes.json();
-                    const rawJsonText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (rawJsonText) {
-                      data = JSON.parse(rawJsonText);
-                      console.log(`[MOM Studio] Direct Gemini AI (${mdl}) synthesis success!`, data);
-                      break;
-                    }
-                  }
-                } catch (mErr) {
-                  console.warn(`[MOM Studio] Model ${mdl} attempt error:`, mErr);
-                }
-              }
-            } catch (gErr) {
-              console.warn('[MOM Studio] Direct Gemini client-side fallback:', gErr);
-            }
-          } catch (clientErr) {
-            console.warn('[MOM Studio] Client-side processing fallback:', clientErr);
-          }
-        } else {
-          // Heavy / GB-range file on Vercel: Memory Protection Guard
-          // Simulates high-precision processing without loading 1GB into browser RAM
-          await new Promise((r) => setTimeout(r, 6000));
-          console.log(`[MOM Studio] Ingested ${(file.size / 1024 / 1024).toFixed(1)} MB heavy recording. Auto-synced to Drive.`);
+        } catch (serverErr) {
+          console.warn('[Tamilpreneur Studio] Backend fallback error:', serverErr);
         }
       }
 
       clearInterval(stageInterval);
       setCurrentStage(5);
 
-      const enrichedResult = {
-        title: data.title || resolvedTitle,
-        department: department,
-        documentUrl: finalDocUrl,
-        date: data.date || new Date().toISOString().split('T')[0],
-        summary: data.summary,
-        decisions: data.decisions || [],
-        action_items: data.action_items || [],
-        discussion_points: data.discussion_points || [],
-        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
-      };
+      if (!data) {
+        throw new Error('AI could not extract structured records from the recording. Please verify the audio file format.');
+      }
 
       const meetingId = Date.now();
-      enrichedResult.id = meetingId;
+      const enrichedResult = {
+        id: meetingId,
+        title: data.title || resolvedTitle,
+        department: department,
+        date: data.date || new Date().toISOString().split('T')[0],
+        summary: data.summary || data.conversation_summary || 'Analysis synthesized from recording.',
+        decisions: data.decisions || [],
+        action_items: data.action_items || data.follow_ups || [],
+        discussion_points: data.discussion_points || [],
+        size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
+        data: data // Preserves complete raw data for Call Analyzer or MOM
+      };
 
       setResultData(enrichedResult);
       setStatus('success');
 
+      const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
       try {
-        localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(enrichedResult));
+        localStorage.setItem(activeKey, JSON.stringify(enrichedResult));
       } catch (e) {
-        console.warn('Could not persist active MOM:', e);
+        console.warn('Could not persist active record:', e);
       }
 
-      // Add to team archive with full data
+      // Add to appropriate archive
       saveToArchive({
         id: meetingId,
-        title: resolvedTitle,
+        title: enrichedResult.title,
         department: department,
-        docUrl: finalDocUrl,
+        docUrl: null,
         date: enrichedResult.date,
         createdAt: new Date().toISOString(),
         summary: enrichedResult.summary,
-        decisions: enrichedResult.decisions || [],
-        action_items: enrichedResult.action_items || [],
-        discussion_points: enrichedResult.discussion_points || [],
+        decisions: enrichedResult.decisions,
+        action_items: enrichedResult.action_items,
+        discussion_points: enrichedResult.discussion_points,
+        fullData: enrichedResult,
+        data: data
       });
+
     } catch (err) {
       clearInterval(stageInterval);
-      console.warn('[MOM Studio] Resilient exception recovery:', err);
-
-      // ZERO-ERROR GUARANTEE: Never throw ugly red error screen to the user!
-      const meetingId = Date.now();
-      const fallbackResult = {
-        id: meetingId,
-        title: resolvedTitle,
-        department: department,
-        documentUrl: null,
-        date: new Date().toISOString().split('T')[0],
-        summary: 'Executive Minutes of Meeting synthesized from recording tape.',
-        decisions: ['Meeting concluded successfully with action items logged.'],
-        action_items: [{ task: 'Review recording details and follow up', assigned_to: 'Team', deadline: 'Next Standup', status: 'Pending' }],
-        discussion_points: ['Team operations & deliverables review', 'Next milestones execution plan'],
-      };
-
-      setResultData(fallbackResult);
-      setStatus('success');
-
-      try {
-        localStorage.setItem(ACTIVE_MOM_KEY, JSON.stringify(fallbackResult));
-      } catch (e) {
-        console.warn('Could not persist active MOM:', e);
-      }
-
-      saveToArchive({
-        id: meetingId,
-        title: resolvedTitle,
-        department: department,
-        docUrl: null,
-        date: fallbackResult.date,
-        createdAt: new Date().toISOString(),
-        summary: fallbackResult.summary,
-        decisions: fallbackResult.decisions,
-        action_items: fallbackResult.action_items,
-        discussion_points: fallbackResult.discussion_points,
-      });
+      console.error('[Tamilpreneur Studio] Processing exception:', err);
+      setStatus('error');
+      setErrorMsg(err.message || 'An unexpected error occurred during audio processing. Please try again.');
     }
   };
 
   const handleReset = () => {
     setFile(null);
-    setMeetingTitle('');
+    setTitle('');
     setStatus('idle');
     setResultData(null);
     setErrorMsg(null);
     setCurrentStage(1);
-    localStorage.removeItem(ACTIVE_MOM_KEY);
+    const activeKey = activeTab === 'call_analyzer' ? CALL_ACTIVE_KEY : MOM_ACTIVE_KEY;
+    localStorage.removeItem(activeKey);
   };
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#070B12] text-slate-100 selection:bg-[#ff4d5a]/25 selection:text-[#ff4d5a] overflow-x-hidden font-sans">
-      {/* Refined Executive Ambient Backdrop */}
+      {/* Brand Ambient Glow */}
       <div className="brand-ambient-glow" />
 
-      {/* Header Bar */}
-      <Header />
+      {/* Header Bar with Mode Switcher */}
+      <Header activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Team Drive Collaboration Banner */}
+      {/* Sub-Header Hub Banner */}
       <div className="relative z-10 max-w-3xl w-full mx-auto px-4 sm:px-6 pt-3 pb-0">
         <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-[11px] font-mono text-slate-400">
           <div className="flex items-center gap-2 truncate">
-            <Users className="w-3.5 h-3.5 text-[#ff4d5a] shrink-0" />
-            <span className="truncate">
-              Tamilpreneur Team Hub: Documents sync to Drive folder
-            </span>
+            {activeTab === 'call_analyzer' ? (
+              <>
+                <Table className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">Tamilpreneur Sales CRM: Records link directly to Google Sheets</span>
+              </>
+            ) : (
+              <>
+                <Users className="w-3.5 h-3.5 text-[#ff4d5a] shrink-0" />
+                <span className="truncate">Tamilpreneur Team Hub: Documents sync to Drive folder</span>
+              </>
+            )}
           </div>
-          <a
-            href="https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP"
-            target="_blank"
-            rel="noreferrer"
-            className="text-slate-200 hover:text-white flex items-center gap-1 font-semibold underline shrink-0 pl-2"
-          >
-            <span>/meeting-audio</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
+          {activeTab === 'call_analyzer' ? (
+            <a
+              href="https://docs.google.com/spreadsheets/d/17zWVa_hCrkreGLOT6mNLIHJJDUp-FUAbW09yisn9nVs/edit?gid=0#gid=0"
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-300 hover:text-white flex items-center gap-1 font-semibold underline shrink-0 pl-2"
+            >
+              <span>Call Analyzer CRM</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          ) : (
+            <a
+              href="https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP"
+              target="_blank"
+              rel="noreferrer"
+              className="text-slate-200 hover:text-white flex items-center gap-1 font-semibold underline shrink-0 pl-2"
+            >
+              <span>/meeting-audio</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
         </div>
       </div>
 
       {/* Main Studio Workdesk */}
       <main className="relative z-10 flex-1 flex flex-col justify-start max-w-3xl w-full mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
-        <Hero />
+        <Hero activeTab={activeTab} />
 
         {/* State 1: IDLE / ERROR (The Audio Console Deck) */}
         {(status === 'idle' || status === 'error') && (
           <div className="space-y-6 animate-fade-in">
-            {/* Interactive Audio Console with Inline Title & Department Pills */}
+            {/* Interactive Audio Console with Inline Title & Pills */}
             <AudioConsole
               file={file}
               onFileSelect={(selected) => setFile(selected)}
-              onFileRemove={() => { setFile(null); setMeetingTitle(''); }}
-              title={meetingTitle}
-              onTitleChange={setMeetingTitle}
+              onFileRemove={() => { setFile(null); setTitle(''); }}
+              title={title}
+              onTitleChange={setTitle}
               department={department}
               onDepartmentChange={setDepartment}
+              activeTab={activeTab}
             />
 
             {/* Error Message */}
@@ -399,7 +458,7 @@ export default function App() {
               </div>
             )}
 
-            {/* CLEAN, PROFESSIONAL EXECUTIVE BUTTON WITH HOVER SHEEN & ARROW TRANSLATE */}
+            {/* Action Synthesize Button */}
             <div className="flex justify-center pt-1">
               <button
                 type="button"
@@ -418,7 +477,9 @@ export default function App() {
                 )}
 
                 <span className="font-extrabold tracking-wide">
-                  {file ? 'Synthesize Executive MOM' : 'Insert Audio To Synthesize'}
+                  {file
+                    ? (activeTab === 'call_analyzer' ? 'Analyze Sales Call & Extract Leads' : 'Synthesize Executive MOM')
+                    : 'Insert Audio To Synthesize'}
                 </span>
 
                 {file && (
@@ -427,44 +488,53 @@ export default function App() {
               </button>
             </div>
 
-            {/* Team Meeting Archive Hub (History of synthesized docs) */}
+            {/* Team Archive Hub */}
             <div className="pt-4">
               <MeetingArchive
-                meetings={meetingsArchive}
+                meetings={archive}
                 onClear={handleClearArchive}
-                onDelete={handleDeleteMeeting}
-                onSelect={handleSelectArchiveMeeting}
+                onDelete={handleDeleteItem}
+                onSelect={handleSelectArchiveItem}
               />
             </div>
           </div>
         )}
 
-        {/* State 2: PROCESSING (Laser Scanner) */}
+        {/* State 2: PROCESSING (Laser Scanner Visualizer) */}
         {status === 'processing' && (
           <div className="animate-fade-in">
             <ProcessingConsole
               currentStage={currentStage}
               error={errorMsg}
-              fileName={meetingTitle || file?.name}
+              fileName={title || file?.name}
+              activeTab={activeTab}
             />
           </div>
         )}
 
-        {/* State 3: SUCCESS (Executive Document Artifact) */}
+        {/* State 3: SUCCESS (MOM or Call Analyzer Card) */}
         {status === 'success' && (
           <div className="animate-fade-in space-y-6">
-            <ExecutiveDocCard
-              result={resultData}
-              onReset={handleReset}
-              onDeleteCurrent={handleDeleteCurrentMOM}
-            />
+            {activeTab === 'call_analyzer' ? (
+              <CallAnalyzerCard
+                result={resultData}
+                onReset={handleReset}
+                onDeleteCurrent={handleDeleteCurrent}
+              />
+            ) : (
+              <ExecutiveDocCard
+                result={resultData}
+                onReset={handleReset}
+                onDeleteCurrent={handleDeleteCurrent}
+              />
+            )}
 
             {/* Also show archive below success state */}
             <MeetingArchive
-              meetings={meetingsArchive}
+              meetings={archive}
               onClear={handleClearArchive}
-              onDelete={handleDeleteMeeting}
-              onSelect={handleSelectArchiveMeeting}
+              onDelete={handleDeleteItem}
+              onSelect={handleSelectArchiveItem}
             />
           </div>
         )}

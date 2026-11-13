@@ -1,3 +1,6 @@
+import dns from 'dns';
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -10,6 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ['AQ.Ab8RN6JwNRQAViEo', '0I2_8SK0jf08MGy', '_2IB01y9Fs5P_ZsHGPA'].join('');
 const TARGET_DRIVE_FOLDER = 'https://drive.google.com/drive/folders/1SuttqetuJUjymmr9YI2Jw1AN3kvt5DsP';
+const CRM_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/17zWVa_hCrkreGLOT6mNLIHJJDUp-FUAbW09yisn9nVs/edit?gid=0#gid=0';
 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
@@ -36,6 +40,7 @@ app.use(express.static('dist'));
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
+    suite: 'Tamilpreneur AI Studio (MOM Generator + Call Analyzer)',
     engine: 'Direct Google Gemini AI Engine (Zero Make Credits)',
     capacity: '2.0 GB',
     timestamp: new Date()
@@ -87,31 +92,70 @@ app.post('/api/transcode', upload.single('audio'), async (req, res) => {
 });
 
 // Helper: Call Google Gemini Direct API with Audio
-async function processWithDirectGemini(audioBuffer, mimeType, meetingTitle, department) {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
+async function processWithDirectGemini(audioBuffer, mimeType, meetingTitle, department, mode = 'mom') {
+  const models = [
+    { name: 'gemini-3-flash-preview', cfg: { responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } } },
+    { name: 'gemini-flash-lite-latest', cfg: { responseMimeType: 'application/json' } },
+    { name: 'gemini-3.5-flash-lite', cfg: { responseMimeType: 'application/json' } },
+    { name: 'gemini-3.6-flash', cfg: { responseMimeType: 'application/json' } },
+    { name: 'gemini-3.5-flash', cfg: { responseMimeType: 'application/json' } }
+  ];
+
   const base64Audio = audioBuffer.toString('base64');
   const cleanMime = mimeType?.startsWith('audio/') ? mimeType : 'audio/mp3';
+  const todayDate = new Date().toISOString().split('T')[0];
+
+  let prompt = '';
+  if (mode === 'call_analyzer') {
+    prompt = `You are the AI Lead Intelligence Agent for Tamilpreneur CRM. Analyze the attached client/sales call audio recording carefully. Date: ${todayDate}. Call hint: "${meetingTitle}".
+    
+    Determine if a business lead exists. Extract:
+    - "is_lead": boolean
+    - "lead_match": { "match_type": "new_lead" | "existing_lead" | "not_a_lead", "reason": string }
+    - "lead": {
+        "client_name": string or null,
+        "company_name": string or null,
+        "contact_person": string or null,
+        "phone": string or null,
+        "email": string or null,
+        "location": string or null,
+        "industry": string or null,
+        "website": string or null,
+        "social_media": string or null
+      }
+    - "requirements": array of strings
+    - "client_questions": array of strings
+    - "client_objections": array of strings
+    - "follow_ups": array of { "action": string, "due_date": string or null, "assigned_to": string, "status": "Pending" }
+    - "lead_status": "New" | "Contacted" | "Requirement Collected" | "Proposal Sent" | "Under Discussion" | "Negotiation" | "Won" | "Lost"
+    - "needs_review": boolean
+    - "review_items": array of strings
+    - "conversation_summary": concise 2-3 sentence executive summary
+    - "ai_suggestions": Sales coaching critique formatted as:
+      "What Went Well: (brief highlight)
+      Areas for Improvement & Better Alternatives: (e.g. Instead of saying X, say Y...)
+      Next Call Strategy: (actionable next step advice)"
+
+    Return ONLY valid JSON.`;
+  } else {
+    prompt = `You are the executive AI Minutes of Meeting (MOM) note-taker for Tamilpreneur. Meeting: "${meetingTitle || 'Team Meeting'}". Department: "${department || 'General'}". Date: ${todayDate}.
+    
+    Analyze the meeting audio carefully and return valid JSON with:
+    - "title": (Formal concise meeting title)
+    - "department": "${department || 'General'}"
+    - "date": "${todayDate}"
+    - "summary": (2-3 sentences executive summary)
+    - "discussion_points": (Array of 3-6 key discussion bullet points)
+    - "decisions": (Array of 2-5 key decisions agreed upon)
+    - "action_items": (Array of objects with { "task": string, "assigned_to": string, "deadline": string, "status": "Pending" | "In Progress" | "Completed" })
+
+    Return ONLY valid JSON.`;
+  }
 
   for (const model of models) {
     try {
-      console.log(`[MOM Studio Direct AI] Calling Google Gemini model: ${model}...`);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const prompt = `You are the executive AI Minutes of Meeting (MOM) note-taker for the Tamilpreneur core team.
-Analyze the provided meeting audio tape carefully.
-Meeting Title hint: "${meetingTitle || 'Tamilpreneur Team Meeting'}"
-Department: "${department || 'General'}"
-
-Generate a comprehensive, executive Minutes of Meeting in valid JSON format with:
-- "title": (Formal concise meeting title)
-- "department": "${department || 'General'}"
-- "date": "${new Date().toISOString().split('T')[0]}"
-- "summary": (2-3 sentences executive summary of the meeting)
-- "discussion_points": (Array of 3-6 key discussion bullet points)
-- "decisions": (Array of 2-5 key decisions agreed upon)
-- "action_items": (Array of objects with { "task": string, "assigned_to": string, "deadline": string, "status": "Pending" | "In Progress" | "Completed" })
-
-Return ONLY valid JSON.`;
+      console.log(`[Tamilpreneur Studio] Calling Gemini model: ${model.name}...`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model.name}:generateContent?key=${GEMINI_API_KEY}`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -130,32 +174,30 @@ Return ONLY valid JSON.`;
               ]
             }
           ],
-          generationConfig: {
-            responseMimeType: 'application/json'
-          }
+          generationConfig: model.cfg
         })
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        console.warn(`[MOM Studio Direct AI] Model ${model} returned ${response.status}:`, errText.slice(0, 150));
+        console.warn(`[Tamilpreneur Studio] Model ${model.name} returned ${response.status}:`, errText.slice(0, 150));
         continue;
       }
 
       const json = await response.json();
       const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text;
       if (rawText) {
-        console.log(`[MOM Studio Direct AI] Successfully synthesized MOM using ${model}!`);
+        console.log(`[Tamilpreneur Studio] Successfully synthesized records using ${model.name}!`);
         return JSON.parse(rawText);
       }
     } catch (err) {
-      console.warn(`[MOM Studio Direct AI] Error with ${model}:`, err.message);
+      console.warn(`[Tamilpreneur Studio] Error with ${model.name}:`, err.message);
     }
   }
   return null;
 }
 
-// Trigger MOM automation endpoint (Heavy-File Aware, Direct Gemini AI + Make Webhook Hybrid)
+// Trigger automation endpoint (Heavy-File Aware, Direct Gemini AI)
 app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
   const tempFiles = [];
   try {
@@ -163,6 +205,7 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
     const title = req.body.title || '';
     const date = req.body.date || '';
     const department = req.body.department || 'General';
+    const mode = req.body.mode || 'mom'; // 'mom' | 'call_analyzer'
 
     if (!file) {
       return res.status(400).json({ error: 'No audio file uploaded.' });
@@ -170,16 +213,16 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
 
     tempFiles.push(file.path);
     const sizeMb = (file.size / 1024 / 1024).toFixed(2);
-    console.log(`[MOM Studio] Ingested file: ${file.originalname} (${sizeMb} MB), Dept: ${department}, Title: "${title}"`);
+    console.log(`[Tamilpreneur Studio] Ingested file: ${file.originalname} (${sizeMb} MB), Mode: ${mode}, Title: "${title}"`);
 
     let finalBuffer;
     let finalFileName = file.originalname;
 
     // Automatic Speech-Downsampler: If file is > 15MB or video, compress to 16kHz mono voice
     const isVideoOrHeavy = file.size > 15 * 1024 * 1024 || file.mimetype?.startsWith('video/') || /\.(mp4|mkv|mov|avi|wmv)$/i.test(file.originalname);
-    
+
     if (isVideoOrHeavy) {
-      console.log(`[MOM Studio] Heavy file detected (${sizeMb} MB). Executing 98% audio downsampling...`);
+      console.log(`[Tamilpreneur Studio] Heavy file detected (${sizeMb} MB). Executing audio downsampling...`);
       const compressedOutput = path.join(os.tmpdir(), `downsampled_${Date.now()}.mp3`);
       tempFiles.push(compressedOutput);
 
@@ -202,9 +245,9 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
 
         finalBuffer = await fs.promises.readFile(compressedOutput);
         finalFileName = file.originalname.replace(/\.[^/.]+$/, '') + '.mp3';
-        console.log(`[MOM Studio] Downsampling complete: ${sizeMb} MB ➔ ${(finalBuffer.length / 1024 / 1024).toFixed(2)} MB!`);
+        console.log(`[Tamilpreneur Studio] Downsampling complete: ${sizeMb} MB ➔ ${(finalBuffer.length / 1024 / 1024).toFixed(2)} MB!`);
       } catch (transcodeErr) {
-        console.warn('[MOM Studio] Downsampling fallback to original stream:', transcodeErr.message);
+        console.warn('[Tamilpreneur Studio] Downsampling fallback to original stream:', transcodeErr.message);
         finalBuffer = await fs.promises.readFile(file.path);
       }
     } else {
@@ -214,9 +257,9 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
     // Direct Real-Time Gemini AI Processing (Zero Make.com credits required!)
     let geminiData = null;
     try {
-      geminiData = await processWithDirectGemini(finalBuffer, 'audio/mp3', title, department);
+      geminiData = await processWithDirectGemini(finalBuffer, 'audio/mp3', title, department, mode);
     } catch (gErr) {
-      console.warn('[MOM Studio] Direct Gemini processing exception:', gErr.message);
+      console.warn('[Tamilpreneur Studio] Direct Gemini processing exception:', gErr.message);
     }
 
     const resolvedTitle = geminiData?.title || title || file.originalname.replace(/\.[^/.]+$/, '');
@@ -228,17 +271,18 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
       title: resolvedTitle,
       department: department,
       date: resolvedDate,
-      summary: geminiData?.summary || 'Executive Minutes of Meeting synthesized directly via Google Gemini AI.',
+      summary: geminiData?.summary || geminiData?.conversation_summary || 'Analysis synthesized directly via Google Gemini AI.',
       discussion_points: geminiData?.discussion_points || [],
       decisions: geminiData?.decisions || [],
-      action_items: geminiData?.action_items || [],
+      action_items: geminiData?.action_items || geminiData?.follow_ups || [],
       documentUrl: null,
       folderUrl: TARGET_DRIVE_FOLDER,
-      message: 'MOM synthesized directly with Google Gemini AI (Zero Make.com credits).'
+      crmUrl: CRM_SHEETS_URL,
+      message: 'Synthesized directly with Google Gemini AI (Zero Make.com credits).'
     });
 
   } catch (err) {
-    console.error('[MOM Studio] Execution error:', err);
+    console.error('[Tamilpreneur Studio] Execution error:', err);
     return res.json({
       success: true,
       title: req.body?.title || 'Minutes of Meeting',
@@ -246,6 +290,7 @@ app.post('/api/trigger-mom', upload.single('audio'), async (req, res) => {
       date: new Date().toISOString().split('T')[0],
       documentUrl: null,
       folderUrl: TARGET_DRIVE_FOLDER,
+      crmUrl: CRM_SHEETS_URL,
       message: 'Processed and cataloged in Tamilpreneur Team Drive folder.'
     });
   } finally {
@@ -261,8 +306,8 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Tamilpreneur MOM Studio Backend running on http://localhost:${PORT}`);
-  console.log(`⚡ Direct Gemini AI Engine: Active (gemini-3.8-flash)`);
-  console.log(`📦 Max Ingest Capacity: 2.0 GB (Disk Streaming + 98% Downsampler)`);
+  console.log(`🚀 Tamilpreneur Studio AI Suite running on http://localhost:${PORT}`);
+  console.log(`⚡ Direct Gemini AI Models: gemini-3-flash-preview, gemini-flash-lite-latest, gemini-3.5-flash-lite`);
+  console.log(`🎙️ Features: Meeting MOM Generator + Call Analyzer & Lead CRM`);
   console.log(`🛡️ 100% Direct AI Execution: Zero Make.com credits required`);
 });

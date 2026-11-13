@@ -2,14 +2,20 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, X, Disc3, Radio, Volume2, VolumeX, Loader2, Edit3, Tag } from 'lucide-react';
 import { transcodeAudioInBrowser } from '../utils/browserAudioTranscoder';
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://tp-mom.onrender.com';
-
-const DEPARTMENTS = [
+const MOM_DEPARTMENTS = [
   { id: 'General', label: 'General', icon: '🏢' },
   { id: 'Tech & Product', label: 'Tech & Product', icon: '🚀' },
   { id: 'Marketing & Growth', label: 'Marketing & Growth', icon: '📢' },
   { id: 'Community & Events', label: 'Community & Events', icon: '🤝' },
   { id: 'Leadership', label: 'Leadership', icon: '💼' }
+];
+
+const CALL_TYPES = [
+  { id: 'Inbound Lead', label: 'Inbound Lead', icon: '🔥' },
+  { id: 'Outbound Pitch', label: 'Outbound Pitch', icon: '📞' },
+  { id: 'Discovery Call', label: 'Discovery Call', icon: '💬' },
+  { id: 'Negotiation', label: 'Negotiation', icon: '🤝' },
+  { id: 'Client Support', label: 'Client Support', icon: '🛠️' }
 ];
 
 export default function AudioConsole({
@@ -19,7 +25,8 @@ export default function AudioConsole({
   title,
   onTitleChange,
   department = 'General',
-  onDepartmentChange
+  onDepartmentChange,
+  activeTab = 'mom'
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -36,11 +43,12 @@ export default function AudioConsole({
   const audioRef = useRef(null);
   const waveformRef = useRef(null);
 
+  const pills = activeTab === 'call_analyzer' ? CALL_TYPES : MOM_DEPARTMENTS;
+
   // ── Waveform decoder ────────────────────────────────────────────────────────
   const decodeWaveform = async (blobData) => {
     try {
       setIsDecoding(true);
-      // Memory Guard: For heavy/GB-range files (> 25MB), use synth peaks to prevent browser RAM freeze
       if (blobData.size > 25 * 1024 * 1024) {
         generateSynthPeaks();
         return;
@@ -97,7 +105,7 @@ export default function AudioConsole({
     setIsDecoding(false);
   };
 
-  // ── Universal In-Browser Transcoder & Player Engine ───────────────────────────
+  // ── Universal In-Browser Transcoder & Player Engine (100% Client-Side, 0 Latency) ──
   useEffect(() => {
     if (!file) {
       setAudioUrl(null);
@@ -120,43 +128,16 @@ export default function AudioConsole({
       const cleanName = file.name
         .replace(/\.[^/.]+$/, '')
         .replace(/[-_]/g, ' ')
-        .replace(/WhatsApp Audio \d{4}-\d{2}-\d{2} at/, 'Team Sync')
+        .replace(/WhatsApp Audio \d{4}-\d{2}-\d{2} at/, activeTab === 'call_analyzer' ? 'Client Call' : 'Team Sync')
         .trim();
-      onTitleChange(cleanName || 'Tamilpreneur Meeting');
+      onTitleChange(cleanName || (activeTab === 'call_analyzer' ? 'Client Sales Call' : 'Tamilpreneur Meeting'));
     }
-
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
     const processAudio = async () => {
       try {
         setIsOptimizing(true);
 
-        // Path A: Localhost / Cloud Node Server with FFmpeg (100% Guaranteed conversion to MP3 for any format)
-        if (isLocal || API_BASE) {
-          try {
-            console.log('[AudioConsole] FFmpeg Backend detected, transcoding audio...');
-            const formData = new FormData();
-            formData.append('audio', file);
-            const endpoint = isLocal ? '/api/transcode' : `${API_BASE}/api/transcode`;
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              body: formData,
-            });
-            if (res.ok) {
-              const mp3Blob = await res.blob();
-              if (isCancelled) return;
-              URL.revokeObjectURL(activeUrl);
-              activeUrl = URL.createObjectURL(mp3Blob);
-              setAudioUrl(activeUrl);
-              decodeWaveform(mp3Blob);
-              return;
-            }
-          } catch (localErr) {
-            console.warn('[AudioConsole] FFmpeg transcode fallback:', localErr);
-          }
-        }
-
-        // Path B: Client-Side WASM + Web Audio Transcoding (For Cloud / Vercel)
+        // Instant In-Browser Decoding (WASM libopus + Web Audio - 100% local, zero Render wait!)
         const res = await transcodeAudioInBrowser(file);
         if (isCancelled) return;
 
@@ -169,7 +150,6 @@ export default function AudioConsole({
           return;
         }
 
-        // Heavy files or MIME-fixed fallback
         const fallback = res.fixedBlob || file;
         URL.revokeObjectURL(activeUrl);
         activeUrl = URL.createObjectURL(fallback);
@@ -180,7 +160,7 @@ export default function AudioConsole({
           decodeWaveform(fallback);
         }
       } catch (err) {
-        console.warn('[AudioConsole] Transcode fallback:', err);
+        console.warn('[AudioConsole] Local transcode fallback:', err);
         if (isCancelled) return;
         decodeWaveform(file);
       } finally {
@@ -329,124 +309,118 @@ export default function AudioConsole({
 
             <div className="flex items-center space-x-2 text-[10px] sm:text-xs font-mono tracking-widest text-[#ff4d5a] uppercase font-bold mb-2">
               <Radio className="w-3.5 h-3.5" />
-              <span>EXECUTIVE RECORDING DECK</span>
+              <span>{activeTab === 'call_analyzer' ? 'SALES CALL RECORDING DECK' : 'EXECUTIVE RECORDING DECK'}</span>
             </div>
 
             <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight mb-2">
-              Drop meeting recording audio
+              {activeTab === 'call_analyzer' ? 'Drop sales or client call recording' : 'Drop meeting recording audio'}
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
               Upload <span className="text-slate-200 font-mono">.MP3</span>,{' '}
               <span className="text-slate-200 font-mono">.WAV</span>, or{' '}
-              <span className="text-slate-200 font-mono">WhatsApp Audio</span>. Automatically extracts action items and syncs with Google Docs.
+              <span className="text-slate-200 font-mono">WhatsApp Audio</span>.{' '}
+              {activeTab === 'call_analyzer'
+                ? 'Automatically extracts lead info, client requirements, objections & gives sales coaching.'
+                : 'Automatically extracts action items, decisions, and creates formatted documents.'}
             </p>
 
             <button
               type="button"
               className="px-6 py-2.5 rounded-xl bg-white/[0.06] group-hover:bg-[#ff4d5a] border border-white/[0.12] group-hover:border-[#ff4d5a] text-slate-100 group-hover:text-white font-medium text-xs sm:text-sm transition-all duration-200 active:scale-95 shadow-sm group-hover:shadow-md group-hover:shadow-[#ff4d5a]/25"
             >
-              Select Audio File
+              Select Audio Recording
             </button>
-          </div>
-
-          <div className="border-t border-white/[0.06] px-5 py-2.5 bg-black/40 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
-            <span>FORMATS: MP3, WAV, WHATSAPP, M4A</span>
-            <span className="text-emerald-400 font-medium">TAMILPRENEUR STUDIO ENGINE</span>
-            <span>AUTO GOOGLE DOCS</span>
           </div>
         </div>
       ) : (
-        /* ═══════════════ LOADED STATE: Professional Audio Deck ═══════════════ */
-        <div className="relative rounded-3xl border border-white/[0.1] bg-[#0A0F1D]/90 backdrop-blur-2xl p-5 sm:p-6 shadow-2xl space-y-4 card-hover-interactive animate-fade-in-up">
-
-          {/* Tape Header & Inline Custom Meeting Title */}
-          <div className="pb-3 border-b border-white/[0.06] space-y-3">
-            <div className="flex items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center space-x-3 min-w-0">
-                <div
-                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#ff4d5a]/10 border border-[#ff4d5a]/25 text-[#ff4d5a] flex items-center justify-center shrink-0 ${
-                    isPlaying ? 'animate-spin-tape' : ''
-                  }`}
-                >
-                  <Disc3 className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400 font-mono">
-                    <span className="truncate max-w-[160px] sm:max-w-xs">{file.name}</span>
-                    <span>({fmtSize(file.size)})</span>
-                    <span>•</span>
-                    {file.size > 25 * 1024 * 1024 ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
-                        ⚡ Direct Scale Stream Active
-                      </span>
-                    ) : isOptimizing ? (
-                      <span className="text-amber-400 flex items-center gap-1">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Optimizing...
-                      </span>
-                    ) : (
-                      <span className="text-emerald-400">Ready</span>
-                    )}
-                  </div>
-                </div>
+        /* ═══════════════ LOADED STATE: Studio Deck ═══════════════ */
+        <div className="rounded-3xl border border-white/[0.1] bg-[#0A0F1D]/90 backdrop-blur-xl p-5 sm:p-7 shadow-2xl relative space-y-5">
+          {/* Top Row: File Badge & Dismiss */}
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-[#ff4d5a]/15 border border-[#ff4d5a]/30 flex items-center justify-center text-[#ff4d5a] shrink-0">
+                <Disc3 className={`w-4 h-4 ${isPlaying ? 'animate-spin' : ''}`} />
               </div>
-
-              <div className="flex items-center space-x-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={rewind}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] transition-all hover:-translate-y-0.5 active:scale-95"
-                  title="Rewind to start"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={eject}
-                  className="p-2 rounded-xl text-slate-400 hover:text-rose-400 bg-white/[0.03] hover:bg-rose-500/10 border border-white/[0.06] transition-all hover:-translate-y-0.5 active:scale-95"
-                  title="Eject audio"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold text-white truncate max-w-xs sm:max-w-md">
+                  {file.name}
+                </p>
+                <div className="flex items-center space-x-2 text-[10px] sm:text-[11px] font-mono text-slate-400">
+                  <span>{fmtSize(file.size)}</span>
+                  <span>•</span>
+                  <span>{file.type || 'audio/recording'}</span>
+                  {isOptimizing && (
+                    <>
+                      <span>•</span>
+                      <span className="text-[#ff4d5a] flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Preparing Waveform...
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Editable Meeting Title Field */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                type="button"
+                onClick={rewind}
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white transition-colors"
+                title="Rewind to start"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={eject}
+                className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                title="Remove recording"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Inline Meeting/Lead Title & Context Pills */}
+          <div className="space-y-3 pt-1">
             <div className="relative">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] focus-within:border-[#ff4d5a]/60 focus-within:ring-1 focus-within:ring-[#ff4d5a]/30 transition-all">
-                <Edit3 className="w-4 h-4 text-[#ff4d5a] shrink-0" />
-                <input
-                  type="text"
-                  value={title || ''}
-                  onChange={(e) => onTitleChange && onTitleChange(e.target.value)}
-                  placeholder="Enter meeting title (e.g. Weekly Product Sync)"
-                  className="w-full bg-transparent text-sm font-semibold text-white placeholder-slate-500 focus:outline-none"
-                />
-                <span className="text-[10px] font-mono text-slate-500 shrink-0 hidden sm:inline">
-                  Click to rename
-                </span>
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+                <Edit3 className="w-4 h-4" />
               </div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => onTitleChange(e.target.value)}
+                placeholder={
+                  activeTab === 'call_analyzer'
+                    ? 'Enter Lead / Client / Company Name (or leave blank to auto-detect)'
+                    : 'Enter Formal Meeting Title (or leave blank to auto-detect)'
+                }
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-black/40 border border-white/[0.08] focus:border-[#ff4d5a] focus:ring-1 focus:ring-[#ff4d5a] text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition-all"
+              />
             </div>
 
-            {/* Department Selection Pills */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-slate-400" /> Select Team / Category:
+            {/* Department / Call Type Selector */}
+            <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 flex items-center gap-1 shrink-0">
+                <Tag className="w-3 h-3" />
+                {activeTab === 'call_analyzer' ? 'Type:' : 'Team:'}
               </span>
-              <div className="flex flex-wrap gap-2">
-                {DEPARTMENTS.map((dept) => {
+              <div className="flex items-center space-x-1.5 shrink-0">
+                {pills.map((dept) => {
                   const isSelected = department === dept.id;
                   return (
                     <button
                       key={dept.id}
                       type="button"
-                      onClick={() => onDepartmentChange && onDepartmentChange(dept.id)}
-                      className={`pill-hover-interactive inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium cursor-pointer ${
+                      onClick={() => onDepartmentChange(dept.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition-all shrink-0 cursor-pointer ${
                         isSelected
-                          ? 'active bg-[#ff4d5a] text-white shadow-sm'
-                          : 'bg-white/[0.03] text-slate-300 hover:bg-white/[0.08] border border-white/[0.06]'
+                          ? 'bg-[#ff4d5a]/20 border border-[#ff4d5a]/50 text-white shadow-sm'
+                          : 'bg-white/[0.02] border border-white/[0.06] text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      <span>{dept.icon}</span>
+                      <span className="mr-1">{dept.icon}</span>
                       <span>{dept.label}</span>
                     </button>
                   );
@@ -455,47 +429,47 @@ export default function AudioConsole({
             </div>
           </div>
 
-          {/* Interactive Waveform Display */}
-          <div>
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-2">
-              <div className="flex items-center space-x-2">
-                <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-[#ff4d5a]' : 'bg-slate-600'}`} />
-                <span className="text-white font-semibold text-xs sm:text-sm">{fmtTime(currentTime)}</span>
-                <span className="text-slate-600">/</span>
-                <span className="text-slate-400 text-xs sm:text-sm">{fmtTime(duration)}</span>
-              </div>
-              <span className="text-[10px] uppercase text-slate-500 tracking-wider hidden sm:inline">
-                Click waveform to scrub
-              </span>
-            </div>
-
+          {/* Interactive Waveform Visualizer */}
+          <div className="space-y-2">
             <div
               ref={waveformRef}
-              onMouseDown={(e) => scrub(e.clientX)}
-              onTouchStart={(e) => e.touches?.[0] && scrub(e.touches[0].clientX)}
-              onTouchMove={(e) => e.touches?.[0] && scrub(e.touches[0].clientX)}
-              className="relative h-20 sm:h-22 bg-[#050811] rounded-2xl border border-white/[0.07] p-2 flex items-center gap-[2px] sm:gap-[3px] cursor-pointer group overflow-hidden select-none"
+              onClick={(e) => scrub(e.clientX)}
+              className="relative h-16 sm:h-20 bg-black/40 rounded-2xl border border-white/[0.06] p-2 flex items-center justify-between gap-1 cursor-pointer overflow-hidden group select-none"
             >
               <div
-                className="absolute top-0 bottom-0 left-0 bg-[#ff4d5a]/[0.10] pointer-events-none transition-all duration-75"
+                className="absolute top-0 bottom-0 left-0 bg-[#ff4d5a]/10 border-r-2 border-[#ff4d5a] transition-all duration-100 pointer-events-none"
                 style={{ width: `${pct}%` }}
               />
-              <div
-                className="absolute top-0 bottom-0 w-[2px] bg-[#ff4d5a] pointer-events-none z-20 transition-all duration-75"
-                style={{ left: `${pct}%` }}
-              />
-              {wavePeaks.map((peak, i) => (
-                <div key={i} className="flex-1 flex items-center justify-center h-full min-w-0">
-                  <div
-                    className={`w-full rounded-full transition-all duration-150 ${
-                      (i / wavePeaks.length) * 100 <= pct
-                        ? 'bg-[#ff4d5a]'
-                        : 'bg-slate-700/60 group-hover:bg-slate-600/90'
-                    }`}
-                    style={{ height: `${Math.round(peak * 100)}%` }}
-                  />
+
+              {wavePeaks.length > 0 ? (
+                wavePeaks.map((peak, idx) => {
+                  const isPlayed = (idx / wavePeaks.length) * 100 <= pct;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex-1 flex items-center justify-center h-full pointer-events-none"
+                    >
+                      <div
+                        className={`w-full max-w-[4px] rounded-full transition-all duration-150 ${
+                          isPlayed
+                            ? 'bg-[#ff4d5a]'
+                            : 'bg-white/[0.12] group-hover:bg-white/[0.25]'
+                        }`}
+                        style={{ height: `${Math.max(14, peak * 100)}%` }}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="w-full flex items-center justify-center text-xs font-mono text-slate-500">
+                  {isDecoding ? 'Decoding audio waveform...' : 'Audio Tape Loaded'}
                 </div>
-              ))}
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1">
+              <span>{fmtTime(currentTime)}</span>
+              <span>{fmtTime(duration)}</span>
             </div>
           </div>
 
@@ -505,7 +479,7 @@ export default function AudioConsole({
               <button
                 type="button"
                 onClick={togglePlay}
-                className="group inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-[#ff4d5a] border border-white/[0.1] hover:border-[#ff4d5a] text-white text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-md hover:shadow-[#ff4d5a]/25"
+                className="group inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-[#ff4d5a] border border-white/[0.1] hover:border-[#ff4d5a] text-white text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:scale-95 shadow-sm hover:shadow-md hover:shadow-[#ff4d5a]/25 cursor-pointer"
               >
                 {isPlaying ? (
                   <>
@@ -543,13 +517,13 @@ export default function AudioConsole({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="text-xs font-mono text-slate-400 hover:text-white underline transition-colors"
+              className="text-xs font-mono text-slate-400 hover:text-white underline transition-colors cursor-pointer"
             >
               Change file
             </button>
           </div>
 
-          {/* Browser Audio Player Bar */}
+          {/* Browser Audio Player Element */}
           {audioUrl && (
             <div className="pt-1">
               <audio

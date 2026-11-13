@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Radio, CheckCircle2, ShieldAlert } from 'lucide-react';
 
-export default function ProcessingConsole({ currentStage, error, fileName }) {
+export default function ProcessingConsole({ currentStage, error, fileName, activeTab = 'mom' }) {
   const [tickerTime, setTickerTime] = useState(0);
 
   useEffect(() => {
@@ -11,13 +11,23 @@ export default function ProcessingConsole({ currentStage, error, fileName }) {
     return () => clearInterval(timer);
   }, []);
 
-  const logs = [
-    { stage: 1, text: `INGEST: Staging audio payload [${fileName || 'audio.mp3'}]` },
+  const momLogs = [
+    { stage: 1, text: `INGEST: Staging audio recording [${fileName || 'audio.mp3'}]` },
     { stage: 2, text: 'PIPELINE: Streaming audio buffer directly to Google Gemini Engine' },
     { stage: 3, text: 'GEMINI STT: Transcribing speech turns & preserving speaker context' },
-    { stage: 4, text: 'INTELLIGENCE: Structuring discussion points, decisions & deadlines' },
-    { stage: 5, text: 'SYNTHESIS: Compiling executive Minutes of Meeting artifact' },
+    { stage: 4, text: 'INTELLIGENCE: Distilling discussion points, decisions & deadlines' },
+    { stage: 5, text: 'SYNTHESIS: Compiling executive Minutes of Meeting document' },
   ];
+
+  const callLogs = [
+    { stage: 1, text: `INGEST: Ingesting client call recording [${fileName || 'call.mp3'}]` },
+    { stage: 2, text: 'PIPELINE: Streaming audio buffer directly to Google Gemini Engine' },
+    { stage: 3, text: 'LEAD EXTRACTION: Identifying client profile, status & requirements' },
+    { stage: 4, text: 'OBJECTIONS & TASKS: Cataloging client questions, concerns & follow-ups' },
+    { stage: 5, text: 'SALES COACHING: Generating AI communication feedback & CRM record' },
+  ];
+
+  const logs = activeTab === 'call_analyzer' ? callLogs : momLogs;
 
   return (
     <div className="rounded-2xl border border-white/[0.12] bg-[#0A0F1D]/95 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
@@ -32,10 +42,10 @@ export default function ProcessingConsole({ currentStage, error, fileName }) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-white tracking-tight">
-              Executive Processing In Progress
+              {activeTab === 'call_analyzer' ? 'Lead Intelligence Processing In Progress' : 'Executive Processing In Progress'}
             </h3>
             <p className="text-[11px] font-mono text-slate-400">
-              DIRECT AI ENGINE: Autonomous Gemini MOM Synthesizer
+              {activeTab === 'call_analyzer' ? 'DIRECT AI ENGINE: Gemini Lead Intelligence Agent' : 'DIRECT AI ENGINE: Autonomous Gemini MOM Synthesizer'}
             </p>
           </div>
         </div>
@@ -101,4 +111,3 @@ export default function ProcessingConsole({ currentStage, error, fileName }) {
     </div>
   );
 }
-
